@@ -23,7 +23,6 @@ env/
 data/
 *.pdf
 *.csv
-*.json
 
 # Logs
 *.log
