@@ -2,7 +2,10 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
+import TopBar from "./TopBar";
+import CommandPalette from "./CommandPalette";
 import { useCase } from "@/context/CaseContext";
+import GlobalChatbot from "./GlobalChatbot";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,9 +20,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (loadingCases) {
     return (
-      <div className="flex h-screen items-center justify-center bg-zinc-950 text-white font-mono text-sm tracking-widest uppercase">
+      <div className="flex h-screen items-center justify-center bg-[var(--background)] text-[var(--text-primary)] font-mono text-sm tracking-widest uppercase">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-6 w-6 rounded-full border-2 border-t-blue-500 border-white/5 animate-spin" />
+          <div className="h-6 w-6 rounded-full border-2 border-t-[var(--primary-accent)] border-[var(--border-primary)] animate-spin" />
           <span>Securing Core Context...</span>
         </div>
       </div>
@@ -27,19 +30,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-screen bg-zinc-950 text-white overflow-hidden font-sans relative">
+    <div className="flex h-screen w-screen bg-[var(--background)] text-[var(--text-primary)] overflow-hidden font-sans relative">
+      <CommandPalette />
+      
       {/* Dynamic Collapsible Sidebar */}
       <Sidebar />
 
       {/* Main Content Area */}
-      <main className="flex-1 h-full overflow-y-auto relative flex flex-col">
+      <main className="flex-1 h-full overflow-hidden relative flex flex-col">
         {/* Glow Ambient background */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-3xl pointer-events-none z-0" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[var(--primary-accent)] opacity-5 rounded-full blur-3xl pointer-events-none z-0" />
         
+        <TopBar />
+
         {/* Layout content wrapper */}
-        <div className="flex-1 p-8 z-10 relative">
+        <div className="flex-1 overflow-y-auto p-8 z-10 relative">
           {children}
         </div>
+
+        {/* Persistent Floating Chatbot */}
+        <GlobalChatbot />
       </main>
     </div>
   );

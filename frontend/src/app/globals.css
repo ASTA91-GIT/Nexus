@@ -1,8 +1,53 @@
 @import "tailwindcss";
 
+/* Base fonts (Outfit and JetBrains Mono) are imported in layout.tsx via next/font */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* LIGHT MODE (DEFAULT IF NOT OVERRIDDEN) */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  
+  --surface-primary: #ffffff;
+  --surface-secondary: #f1f5f9;
+  --surface-tertiary: #e2e8f0;
+  
+  --border-primary: #cbd5e1;
+  --border-secondary: #e2e8f0;
+  
+  --primary-accent: #2563eb;
+  --primary-hover: #1d4ed8;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+}
+
+html.dark {
+  /* DARK MODE */
+  --background: #09090b;
+  --foreground: #fafafa;
+  
+  --surface-primary: #18181b;
+  --surface-secondary: #27272a;
+  --surface-tertiary: #3f3f46;
+  
+  --border-primary: #3f3f46;
+  --border-secondary: #27272a;
+  
+  --primary-accent: #3b82f6;
+  --primary-hover: #2563eb;
+  
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --success: #34d399;
 }
 
 @theme inline {
@@ -12,15 +57,8 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }

@@ -22,7 +22,6 @@ export default function AiInvestigatorPage() {
     return `${baseUrl}${path}`;
   };
 
-  // Scroll to bottom when messages update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -30,12 +29,7 @@ export default function AiInvestigatorPage() {
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || !activeCaseId) return;
 
-    // Add user message
-    const userMsg: Message = {
-      sender: "user",
-      text: text,
-      timestamp: new Date()
-    };
+    const userMsg: Message = { sender: "user", text: text, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
     setSending(true);
@@ -58,92 +52,75 @@ export default function AiInvestigatorPage() {
         };
         setMessages((prev) => [...prev, aiMsg]);
       } else {
-        const aiMsg: Message = {
-          sender: "ai",
-          text: "I encountered a communication error querying the case intelligence files.",
-          timestamp: new Date()
-        };
+        const aiMsg: Message = { sender: "ai", text: "I encountered a communication error querying the case intelligence files.", timestamp: new Date() };
         setMessages((prev) => [...prev, aiMsg]);
       }
     } catch (err) {
       console.error(err);
-      const aiMsg: Message = {
-        sender: "ai",
-        text: "Failed to connect to the backend AI agent.",
-        timestamp: new Date()
-      };
+      const aiMsg: Message = { sender: "ai", text: "Failed to connect to the backend AI agent.", timestamp: new Date() };
       setMessages((prev) => [...prev, aiMsg]);
     } finally {
       setSending(false);
     }
   };
 
-  const handleSuggest = (q: string) => {
-    handleSendMessage(q);
-  };
+  const handleSuggest = (q: string) => handleSendMessage(q);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] w-full gap-4 relative overflow-hidden">
-      {/* Header */}
-      <div className="border-b border-white/5 pb-4 shrink-0">
-        <h1 className="text-2xl font-extrabold tracking-tight">AI Investigator Terminal</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Grounded case queries. Intercepts intent, traces NetworkX connections, and formats factual reports.
+    <div className="flex flex-col h-[calc(100vh-4rem)] w-full gap-6 relative overflow-hidden pb-4">
+      <div className="border-b border-[var(--border-primary)] pb-4 shrink-0 mx-4 mt-4">
+        <h1 className="text-2xl font-extrabold tracking-tight text-[var(--text-primary)]">AI Investigator Terminal</h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
+          Grounded case queries. Intercepts intent, traces Network connections, and formats factual reports.
         </p>
       </div>
 
       {!activeCaseId ? (
-        <div className="p-16 border border-dashed border-white/5 rounded-2xl text-center text-zinc-600 flex-grow">
+        <div className="m-4 p-16 border border-dashed border-[var(--border-primary)] rounded-2xl text-center text-[var(--text-secondary)] flex-grow">
           Please select an active Case File from the sidebar to initialize the AI Investigator.
         </div>
       ) : (
-        <div className="flex-1 flex gap-6 min-h-0 overflow-hidden">
+        <div className="flex-1 flex gap-6 min-h-0 overflow-hidden px-4">
           
-          {/* Chat Window Area */}
-          <div className="flex-1 border border-white/5 bg-zinc-900/10 rounded-2xl flex flex-col min-h-0 backdrop-blur-sm">
-            {/* Messages Display */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
+          <div className="flex-1 border border-[var(--border-primary)] bg-[var(--surface-primary)] rounded-2xl flex flex-col min-h-0 backdrop-blur-md shadow-2xl overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-md mx-auto">
-                  <span className="text-4xl mb-4">🤖</span>
-                  <h3 className="text-base font-extrabold text-white">NEXUS Investigation Agent</h3>
-                  <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
+                  <span className="text-5xl mb-4 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">🤖</span>
+                  <h3 className="text-lg font-extrabold text-[var(--text-primary)]">NEXUS Investigation Agent</h3>
+                  <p className="text-xs text-[var(--text-secondary)] mt-2 leading-relaxed">
                     Ask me about connection paths between suspects, why specific nodes carry high risk index, or for summaries of case evidence files.
                   </p>
                 </div>
               ) : (
                 messages.map((msg, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`flex flex-col max-w-[75%] ${
-                      msg.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"
-                    }`}
-                  >
-                    {/* Timestamp / Sender info */}
-                    <span className="text-[9px] text-zinc-500 mb-1 font-mono">
-                      {msg.sender === "user" ? "INVESTIGATOR" : "NEXUS AI"} — {msg.timestamp.toLocaleTimeString()}
+                  <div key={idx} className={`flex flex-col max-w-[80%] ${msg.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"}`}>
+                    <span className="text-[10px] text-[var(--text-tertiary)] mb-1.5 font-mono font-bold tracking-wider uppercase">
+                      {msg.sender === "user" ? "INVESTIGATOR" : "NEXUS AI"} — {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </span>
 
-                    {/* Chat Bubble */}
-                    <div className={`p-4 rounded-2xl text-xs border leading-relaxed ${
+                    <div className={`p-4 text-sm leading-relaxed shadow-lg ${
                       msg.sender === "user" 
-                        ? "bg-blue-600/10 border-blue-500/20 text-white rounded-tr-none" 
-                        : "bg-zinc-950/60 border-white/5 text-zinc-300 rounded-tl-none shadow-md"
+                        ? "bg-gradient-to-br from-[var(--primary-accent)] to-blue-700 text-white rounded-2xl rounded-tr-sm" 
+                        : "bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] rounded-2xl rounded-tl-sm"
                     }`}>
-                      <p>{msg.text}</p>
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
 
-                      {/* Supporting Evidence tag */}
                       {msg.evidence && msg.evidence.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-white/5 text-[9px] font-mono text-zinc-500 space-y-1">
-                          <p className="font-bold uppercase text-zinc-600">Grounded facts retrieved:</p>
-                          {msg.evidence.map((ev, i) => <div key={i} className="truncate">&bull; {ev}</div>)}
+                        <div className="mt-4 pt-4 border-t border-[var(--border-primary)] text-[10px] font-mono text-[var(--text-secondary)] space-y-1.5">
+                          <p className="font-bold uppercase text-[var(--text-tertiary)] mb-2 tracking-wider">Grounded facts retrieved:</p>
+                          {msg.evidence.map((ev, i) => (
+                            <div key={i} className="flex gap-2 items-start bg-[var(--surface-primary)] p-2 rounded border border-[var(--border-primary)]">
+                              <span className="text-[var(--primary-accent)]">📎</span>
+                              <span className="leading-tight">{ev}</span>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
 
-                    {/* AI Actions display */}
                     {msg.actions && msg.actions.length > 0 && (
-                      <div className="mt-2 flex gap-2">
+                      <div className="mt-2 flex flex-wrap gap-2">
                         {msg.actions.map((act, i) => (
                           <button
                             key={i}
@@ -151,15 +128,13 @@ export default function AiInvestigatorPage() {
                               if (act.type === "TRACE_PATH") {
                                 localStorage.setItem("activeCaseId", activeCaseId);
                                 window.location.href = `/investigate?src=${act.source}&tgt=${act.target}`;
-                              } else if (act.type === "FILTER_RISK") {
-                                window.location.href = "/investigate";
-                              } else if (act.type === "FOCUS_NODE") {
+                              } else {
                                 window.location.href = "/investigate";
                               }
                             }}
-                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[9px] rounded-lg transition-all"
+                            className="px-3 py-1.5 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all"
                           >
-                            Execute action: {act.type.replace("_", " ")}
+                            Execute: {act.type.replace("_", " ")}
                           </button>
                         ))}
                       </div>
@@ -170,64 +145,42 @@ export default function AiInvestigatorPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Bar */}
-            <div className="p-4 border-t border-white/5 bg-zinc-950/20">
-              <form 
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSendMessage(inputValue);
-                }} 
-                className="flex gap-3"
-              >
+            <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--surface-secondary)]/50">
+              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(inputValue); }} className="flex gap-3">
                 <input 
-                  type="text" 
-                  placeholder="Ask NEXUS AI (e.g. 'how is John Doe connected to Alice Smith?')"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  className="flex-1 px-4 py-3 rounded-xl bg-zinc-950 border border-white/10 text-xs focus:outline-none focus:border-blue-500 placeholder-zinc-700 text-white"
-                  disabled={sending}
-                  required
+                  type="text" placeholder="Ask NEXUS AI (e.g. 'how is John Doe connected to Alice Smith?')"
+                  value={inputValue} onChange={(e) => setInputValue(e.target.value)} disabled={sending} required
+                  className="flex-1 px-4 py-3 rounded-xl bg-[var(--surface-primary)] border border-[var(--border-primary)] text-sm focus:outline-none focus:border-[var(--primary-accent)] text-[var(--text-primary)] transition-colors shadow-inner"
                 />
-                <button 
-                  type="submit" 
-                  disabled={sending || !inputValue.trim()}
-                  className="px-5 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl text-xs font-bold transition-all active:scale-[0.98]"
-                >
-                  {sending ? "Analyzing..." : "Query AI"}
+                <button type="submit" disabled={sending || !inputValue.trim()} className="px-6 py-3 bg-[var(--primary-accent)] hover:bg-[var(--primary-hover)] disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-[var(--primary-accent)]/20">
+                  {sending ? "Analyzing..." : "Query"}
                 </button>
               </form>
             </div>
           </div>
 
-          {/* Right sidebar panel: Suggestion queries */}
-          <aside className="w-80 border border-white/5 bg-zinc-900/10 p-5 rounded-2xl flex flex-col gap-4 backdrop-blur-sm shrink-0">
+          <aside className="w-80 bg-[var(--surface-primary)] border border-[var(--border-primary)] p-5 rounded-2xl flex flex-col gap-5 backdrop-blur-md shrink-0 shadow-2xl">
             <div>
-              <h3 className="text-sm font-bold text-zinc-300">💡 Suggested Prompts</h3>
-              <p className="text-[10px] text-zinc-500 leading-tight mt-0.5">Quick grounded case actions.</p>
+              <h3 className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wider">💡 Suggested Prompts</h3>
+              <p className="text-[10px] text-[var(--text-secondary)] leading-tight mt-1">Quick grounded case actions.</p>
             </div>
-            
             <div className="space-y-3 flex-1 overflow-y-auto">
-              <button 
-                onClick={() => handleSuggest("Who are the high risk entities?")}
-                className="w-full text-left p-3.5 rounded-xl border border-white/5 hover:border-white/10 bg-zinc-950/40 text-xs text-zinc-400 hover:text-zinc-200 transition-all font-semibold leading-relaxed cursor-pointer"
-              >
-                &ldquo;Who are the high risk entities?&rdquo;
-              </button>
-              <button 
-                onClick={() => handleSuggest("how is John Doe connected to Alice Smith?")}
-                className="w-full text-left p-3.5 rounded-xl border border-white/5 hover:border-white/10 bg-zinc-950/40 text-xs text-zinc-400 hover:text-zinc-200 transition-all font-semibold leading-relaxed cursor-pointer"
-              >
-                &ldquo;How is John Doe connected to Alice Smith?&rdquo;
-              </button>
-              <button 
-                onClick={() => handleSuggest("why is Alice Smith high risk?")}
-                className="w-full text-left p-3.5 rounded-xl border border-white/5 hover:border-white/10 bg-zinc-950/40 text-xs text-zinc-400 hover:text-zinc-200 transition-all font-semibold leading-relaxed cursor-pointer"
-              >
-                &ldquo;Why is Alice Smith high risk?&rdquo;
-              </button>
+              {[
+                "Who are the high risk entities?",
+                "How is John Doe connected to Alice Smith?",
+                "Why is Alice Smith high risk?",
+                "Summarize all activities from the last 24 hours.",
+                "Find all phone numbers linked to the primary suspect."
+              ].map((query, i) => (
+                <button 
+                  key={i} onClick={() => handleSuggest(query)}
+                  className="w-full text-left p-3.5 rounded-xl border border-[var(--border-primary)] hover:border-[var(--primary-accent)]/50 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all font-semibold leading-relaxed cursor-pointer"
+                >
+                  &ldquo;{query}&rdquo;
+                </button>
+              ))}
             </div>
           </aside>
-
         </div>
       )}
     </div>

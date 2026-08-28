@@ -10,17 +10,39 @@ async def run_ai_investigator(query: str, case_id: str, db) -> Dict[str, Any]:
     and queries Hugging Face API (or falls back to rule-based grounding) to generate factual reports.
     """
     # Retrieve all entities and relationships for grounding context
-    entities = await db["entities"].find({"case_id": case_id}).to_list(None)
-    relationships = await db["relationships"].find({"case_id": case_id}).to_list(None)
+    if case_id == "all":
+        entities = await db["entities"].find({}).to_list(None)
+        relationships = await db["relationships"].find({}).to_list(None)
+    else:
+        entities = await db["entities"].find({"case_id": case_id}).to_list(None)
+        relationships = await db["relationships"].find({"case_id": case_id}).to_list(None)
     
     if not entities:
+        scope_text = "in the database yet" if case_id == "all" else "recorded in this case yet"
         return {
-            "answer": "There are no entities recorded in this case yet. Please upload case evidence first.",
+            "answer": f"There are no entities {scope_text}. Please upload case evidence first.",
             "actions": [],
             "supporting_evidence": []
         }
         
     query_lower = query.lower()
+    
+    # Pre-build deduplication data if case_id == "all"
+    unique_entities = {}
+    entity_id_map = {}
+    if case_id == "all":
+        for ent in entities:
+            ent_id = str(ent["_id"])
+            key = (ent.get("type", "PERSON").upper(), ent.get("name", "").strip().lower())
+            if key not in unique_entities:
+                canonical_id = ent_id
+                ent_copy = dict(ent)
+                ent_copy["_id"] = canonical_id
+                unique_entities[key] = ent_copy
+                entity_id_map[ent_id] = canonical_id
+            else:
+                canonical_id = unique_entities[key]["_id"]
+                entity_id_map[ent_id] = canonical_id
     
     # 1. INTENT DETECT: Path Connection Tracing
     # e.g., "how is John Doe connected to Alice Smith?" or "find connection between A and B"
@@ -37,25 +59,50 @@ async def run_ai_investigator(query: str, case_id: str, db) -> Dict[str, Any]:
             missing = []
             if not ent1: missing.append(f"'{name1}'")
             if not ent2: missing.append(f"'{name2}'")
+            scope_text = "database" if case_id == "all" else "case directory"
             return {
-                "answer": f"I couldn't locate {' and '.join(missing)} in the case directory. Please verify suspect names.",
+                "answer": f"I couldn't locate {' and '.join(missing)} in the {scope_text}. Please verify suspect names.",
                 "actions": [],
                 "supporting_evidence": []
             }
             
-        G = build_graph(entities, relationships)
-        path = find_shortest_path(G, str(ent1["_id"]), str(ent2["_id"]))
+        # Build Graph
+        if case_id == "all":
+            import networkx as nx
+            G = nx.Graph()
+            for ent in unique_entities.values():
+                G.add_node(
+                    ent["_id"],
+                    type=ent.get("type"),
+                    name=ent.get("name"),
+                    risk_score=ent.get("risk_score", 0)
+                )
+            for rel in relationships:
+                src = entity_id_map.get(str(rel.get("source_entity_id")))
+                tgt = entity_id_map.get(str(rel.get("target_entity_id")))
+                if src and tgt and src != tgt:
+                    G.add_edge(src, tgt, type=rel.get("type"))
+            
+            start_id = entity_id_map.get(str(ent1["_id"]), str(ent1["_id"]))
+            target_id = entity_id_map.get(str(ent2["_id"]), str(ent2["_id"]))
+            path = find_shortest_path(G, start_id, target_id)
+        else:
+            G = build_graph(entities, relationships)
+            start_id = str(ent1["_id"])
+            target_id = str(ent2["_id"])
+            path = find_shortest_path(G, start_id, target_id)
         
         if not path:
+            scope_text = "across cases" if case_id == "all" else "in this case"
             return {
-                "answer": f"Analysis complete: No network path was found linking suspect '{ent1['name']}' to '{ent2['name']}' in this case.",
+                "answer": f"Analysis complete: No network path was found linking suspect '{ent1['name']}' to '{ent2['name']}' {scope_text}.",
                 "actions": [],
                 "supporting_evidence": []
             }
             
         # Compile path descriptions
         chain = []
-        entity_map = {str(e["_id"]): e for e in entities}
+        entity_map = {str(e["_id"]): e for e in unique_entities.values()} if case_id == "all" else {str(e["_id"]): e for e in entities}
         for i, node_id in enumerate(path):
             curr_ent = entity_map.get(node_id)
             if curr_ent:
@@ -72,7 +119,7 @@ async def run_ai_investigator(query: str, case_id: str, db) -> Dict[str, Any]:
             
         return {
             "answer": answer,
-            "actions": [{"type": "TRACE_PATH", "source": str(ent1["_id"]), "target": str(ent2["_id"])}],
+            "actions": [{"type": "TRACE_PATH", "source": start_id, "target": target_id, "scope": case_id}],
             "supporting_evidence": [path_str]
         }
 
@@ -96,25 +143,32 @@ async def run_ai_investigator(query: str, case_id: str, db) -> Dict[str, Any]:
                 status_flag = "suspicious attributes" if properties.get("flagged") else "network positions"
                 answer = f"Suspect '{ent['name']}' has a risk score of {risk:.2f} due to {status_flag}. Attributes recorded: {properties}."
                 
+            node_id = entity_id_map.get(str(ent["_id"]), str(ent["_id"])) if case_id == "all" else str(ent["_id"])
             return {
                 "answer": answer,
-                "actions": [{"type": "FOCUS_NODE", "node_id": str(ent["_id"])}],
+                "actions": [{"type": "FOCUS_NODE", "node_id": node_id, "scope": case_id}],
                 "supporting_evidence": [f"Risk score: {risk}"]
             }
 
     # 3. INTENT DETECT: List High Threat Targets
     # e.g., "who are the high risk entities?"
     if "high risk" in query_lower or "threats" in query_lower:
-        high_risk_ents = [e for e in entities if e.get("risk_score", 0.0) > 0.7]
+        if case_id == "all":
+            high_risk_ents = [e for e in unique_entities.values() if e.get("risk_score", 0.0) > 0.7]
+        else:
+            high_risk_ents = [e for e in entities if e.get("risk_score", 0.0) > 0.7]
+            
         if not high_risk_ents:
+            scope_text = "database" if case_id == "all" else "active case file"
             return {
-                "answer": "No high-risk entities (risk index > 0.70) are currently recorded in the active case file.",
+                "answer": f"No high-risk entities (risk index > 0.70) are currently recorded in the {scope_text}.",
                 "actions": [],
                 "supporting_evidence": []
             }
             
         list_str = ", ".join([f"'{e['name']}' (Risk: {e['risk_score']:.2f})" for e in high_risk_ents])
-        grounding_context = f"High-risk suspects detected in this case: {list_str}."
+        scope_text = "all combined cases" if case_id == "all" else "this case"
+        grounding_context = f"High-risk suspects detected in {scope_text}: {list_str}."
         
         prompt = f"System: You are NEXUS Forensic AI. Present the list of high threat targets professionally.\nFact: {grounding_context}\nQuestion: {query}\nAnswer:"
         answer = call_hf_api(prompt)
@@ -123,16 +177,25 @@ async def run_ai_investigator(query: str, case_id: str, db) -> Dict[str, Any]:
             
         return {
             "answer": answer,
-            "actions": [{"type": "FILTER_RISK", "min_risk": 0.7}],
+            "actions": [{"type": "FILTER_RISK", "min_risk": 0.7, "scope": case_id}],
             "supporting_evidence": [e["name"] for e in high_risk_ents]
         }
 
     # 4. DEFAULT: General Case Summary facts
-    case_summary = f"Active case file holds {len(entities)} suspects and {len(relationships)} linkages."
+    if case_id == "all":
+        suspects_count = len(unique_entities)
+        linkages_count = len(relationships)
+        case_summary = f"The global database holds {suspects_count} unique suspects and {linkages_count} linkages across all cases."
+    else:
+        case_summary = f"Active case file holds {len(entities)} suspects and {len(relationships)} linkages."
+        
     prompt = f"System: You are NEXUS Forensic AI. Answer the question based on the case metrics.\nFact: {case_summary}\nQuestion: {query}\nAnswer:"
     answer = call_hf_api(prompt)
     if not answer:
-        answer = f"I am connected to the active investigation database. Currently, we have registered {len(entities)} suspect profiles and {len(relationships)} connections in this case file."
+        if case_id == "all":
+            answer = f"I am connected to the global NEXUS intelligence database. Currently, we have registered {suspects_count} unique suspect profiles and {linkages_count} connections across all investigation files."
+        else:
+            answer = f"I am connected to the active investigation database. Currently, we have registered {len(entities)} suspect profiles and {len(relationships)} connections in this case file."
         
     return {
         "answer": answer,

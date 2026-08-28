@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   description: "Advanced intelligence platform featuring 3D network graphs, risk scoring, and evidence management.",
 };
 
+import { ThemeProvider } from "@/context/ThemeContext";
+
 export default function RootLayout({
   children,
 }: {
@@ -30,12 +32,14 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-zinc-950 text-white">
-        <CaseProvider>
-          <AppShell>
-            {children}
-          </AppShell>
-        </CaseProvider>
+      <body className="min-h-full bg-background text-foreground transition-colors duration-300 antialiased font-sans">
+        <ThemeProvider>
+          <CaseProvider>
+            <AppShell>
+              {children}
+            </AppShell>
+          </CaseProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

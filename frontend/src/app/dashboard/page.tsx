@@ -1,440 +1,230 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCase } from "@/context/CaseContext";
+import Link from "next/link";
+
+const NetworkScene = dynamic(() => import("../../three/NetworkScene"), { ssr: false });
 
 export default function Dashboard() {
-  const { cases, activeCaseId, activeCase, refreshCases, setActiveCaseId } = useCase();
+  const { cases, activeCaseId, activeCase } = useCase();
   
-  // Stats and lists for active case
-  const [entities, setEntities] = useState<any[]>([]);
-  const [relationships, setRelationships] = useState<any[]>([]);
-  const [alerts, setAlerts] = useState<any[]>([]);
-  
-  // Interactive form states
-  const [newCaseName, setNewCaseName] = useState("");
-  const [newCaseDesc, setNewCaseDesc] = useState("");
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  
-  // UI states
+  const [graphData, setGraphData] = useState<any>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [calculatingRisk, setCalculatingRisk] = useState(false);
-  const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
-  const router = useRouter();
-
-  // API base URL helper
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [highRiskEntities, setHighRiskEntities] = useState<any[]>([]);
+  
   const getApiUrl = (path: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
     return `${baseUrl}${path}`;
   };
 
-  // Logged-in token
-  const getToken = useCallback(() => {
-    return localStorage.getItem("token");
-  }, []);
-
-
-
-  // Fetch active case stats, entities, and alerts
-  const fetchCaseDetails = useCallback(async (caseId: string) => {
-    if (!caseId) return;
-    const token = getToken();
+  const fetchCommandCenterData = useCallback(async () => {
+    const token = localStorage.getItem("token");
     if (!token) return;
-
+    
     try {
       setLoading(true);
-      // Fetch Entities
-      const entitiesRes = await fetch(getApiUrl(`/api/entities/?case_id=${caseId}`), {
+      
+      // 1. Fetch Global or Active Case Network
+      const networkEndpoint = activeCaseId 
+        ? `/api/network/${activeCaseId}` 
+        : `/api/network/global`;
+        
+      const netRes = await fetch(getApiUrl(networkEndpoint), {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (entitiesRes.ok) {
-        const entitiesData = await entitiesRes.json();
-        setEntities(entitiesData);
+      
+      if (netRes.ok) {
+        const netData = await netRes.json();
+        setGraphData(netData);
+        
+        // Extract top entities from nodes
+        const nodes = netData.nodes || [];
+        const sorted = [...nodes].sort((a: any, b: any) => (b.risk_score || 0) - (a.risk_score || 0));
+        setHighRiskEntities(sorted.slice(0, 10));
       }
 
-      // Fetch Relationships
-      const relsRes = await fetch(getApiUrl(`/api/relationships/?case_id=${caseId}`), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (relsRes.ok) {
-        const relsData = await relsRes.json();
-        setRelationships(relsData);
+      // 2. Fetch Alerts
+      if (activeCaseId) {
+        const altRes = await fetch(getApiUrl(`/api/alerts/?case_id=${activeCaseId}`), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (altRes.ok) {
+          const altData = await altRes.json();
+          setAlerts(altData);
+        }
       }
-
-      // Fetch Alerts
-      const alertsRes = await fetch(getApiUrl(`/api/alerts/?case_id=${caseId}`), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (alertsRes.ok) {
-        const alertsData = await alertsRes.json();
-        setAlerts(alertsData);
-      }
+      
     } catch (err) {
-      console.error("Failed to load case details:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
-
-
+  }, [activeCaseId]);
 
   useEffect(() => {
-    if (activeCaseId) {
-      fetchCaseDetails(activeCaseId);
-    }
-  }, [activeCaseId, fetchCaseDetails]);
-
-
-
-  // Create new case
-  const handleCreateCase = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const token = getToken();
-    if (!token || !newCaseName.trim()) return;
-
-    try {
-      const res = await fetch(getApiUrl("/api/cases/"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: newCaseName,
-          description: newCaseDesc,
-          status: "OPEN"
-        })
-      });
-
-      if (res.ok) {
-        const created = await res.json();
-        setNewCaseName("");
-        setNewCaseDesc("");
-        setMessage({ text: `Case "${created.name}" created!`, isError: false });
-        
-        // Refresh case list and select the newly created case
-        await refreshCases();
-        setActiveCaseId(created._id);
-      } else {
-        setMessage({ text: "Failed to create case.", isError: true });
-      }
-    } catch (err) {
-      console.error(err);
-      setMessage({ text: "Error creating case.", isError: true });
-    }
-  };
-
-  // Handle file ingestion
-  const handleUploadFile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const token = getToken();
-    if (!token || !uploadFile || !activeCaseId) return;
-
-    setUploading(true);
-    setMessage(null);
-    const formData = new FormData();
-    formData.append("case_id", activeCaseId);
-    formData.append("file", uploadFile);
-
-    try {
-      const res = await fetch(getApiUrl("/api/ingestion/upload"), {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        setMessage({ text: `File "${uploadFile.name}" ingested successfully! Evidence registered.`, isError: false });
-        setUploadFile(null);
-        // Clear input file
-        const fileInput = document.getElementById("file-input") as HTMLInputElement;
-        if (fileInput) fileInput.value = "";
-        
-        // Reload details to capture new entities/evidence
-        fetchCaseDetails(activeCaseId);
-      } else {
-        const errData = await res.json();
-        setMessage({ text: errData.detail || "Ingestion failed.", isError: true });
-      }
-    } catch (err) {
-      console.error(err);
-      setMessage({ text: "Error uploading file.", isError: true });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Recalculate network risk
-  const handleCalculateRisk = async () => {
-    const token = getToken();
-    if (!token || !activeCaseId) return;
-
-    setCalculatingRisk(true);
-    setMessage(null);
-
-    try {
-      const res = await fetch(getApiUrl(`/api/alerts/calculate-risk/${activeCaseId}`), {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        setMessage({ text: `${result.message} Generated ${result.alerts_created} new alerts.`, isError: false });
-        // Refresh detail tables
-        fetchCaseDetails(activeCaseId);
-      } else {
-        setMessage({ text: "Risk computation failed.", isError: true });
-      }
-    } catch (err) {
-      console.error(err);
-      setMessage({ text: "Error calculating network risk matrix.", isError: true });
-    } finally {
-      setCalculatingRisk(false);
-    }
-  };
-
-
+    fetchCommandCenterData();
+  }, [fetchCommandCenterData]);
 
   return (
-    <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="p-6 border-b border-white/5 flex justify-between items-center bg-zinc-950/40 backdrop-blur">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">Investigation Overview</h1>
-            <p className="text-sm text-zinc-500 mt-1">
-              {activeCase ? `Analyzing case: ${activeCase.name}` : "Create a case to begin investigating connections."}
+    <div className="relative w-full h-[calc(100vh-4rem)] bg-[var(--background)] overflow-hidden">
+      
+      {/* BACKGROUND 3D GRAPH (CENTERPIECE) */}
+      <div className="absolute inset-0 z-0">
+        {!loading && graphData.nodes.length > 0 ? (
+          <NetworkScene data={graphData} onNodeClick={() => {}} />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-black/10">
+            {loading ? (
+              <div className="animate-spin rounded-full h-12 w-12 border-2 border-t-[var(--primary-accent)] border-[var(--border-primary)]" />
+            ) : (
+              <p className="text-[var(--text-secondary)] font-mono text-sm tracking-widest uppercase">NO NETWORK DATA</p>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* OVERLAY GRADIENTS FOR SPATIAL DEPTH */}
+      <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-b from-[var(--background)] via-transparent to-[var(--background)] opacity-60" />
+      <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-r from-[var(--background)] via-transparent to-[var(--background)] opacity-40" />
+
+      {/* FLOATING PANELS */}
+      <div className="absolute inset-0 z-20 p-6 flex flex-col justify-between pointer-events-none">
+        
+        {/* TOP ROW */}
+        <div className="flex justify-between items-start pointer-events-auto">
+          <div className="bg-[var(--surface-primary)]/80 backdrop-blur-md border border-[var(--border-primary)] rounded-xl p-4 shadow-2xl">
+            <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-[var(--text-primary)] to-[var(--text-tertiary)] bg-clip-text text-transparent">
+              COMMAND CENTER
+            </h1>
+            <div className="text-[10px] font-mono font-bold text-[var(--success)] mt-1 tracking-widest flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" /> 
+              SYSTEM ONLINE
+            </div>
+          </div>
+          
+          <div className="bg-[var(--surface-primary)]/80 backdrop-blur-md border border-[var(--border-primary)] rounded-xl p-4 shadow-2xl text-right">
+            <p className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Active Case Status</p>
+            <p className="font-mono text-sm font-bold text-[var(--text-primary)]">
+              {activeCase ? `${activeCase.name} [${activeCase.status}]` : "GLOBAL DB OVERVIEW"}
             </p>
           </div>
-          {activeCaseId && (
-            <button 
-              onClick={handleCalculateRisk}
-              disabled={calculatingRisk}
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:from-blue-600/50 disabled:to-indigo-600/50 shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 active:scale-[0.98] rounded-full font-bold text-sm transition-all"
-            >
-              {calculatingRisk ? "Running Analysis..." : "Run AI Risk Calculation"}
-            </button>
-          )}
-        </header>
-
-        {/* Inner Content scroll */}
-        <div className="p-8 flex flex-col gap-8 max-w-7xl w-full mx-auto">
-          
-          {/* Notifications */}
-          {message && (
-            <div className={`p-4 rounded-xl border text-sm ${
-              message.isError 
-                ? "bg-red-500/10 border-red-500/20 text-red-400" 
-                : "bg-blue-500/10 border-blue-500/20 text-blue-400"
-            }`}>
-              {message.text}
-            </div>
-          )}
-
-          {/* Stats Summary Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-zinc-900/30 border border-white/5 p-6 rounded-2xl backdrop-blur-sm hover:border-white/10 transition-colors">
-              <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider block mb-1">Total Cases</span>
-              <p className="text-3xl font-extrabold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-                {cases.length}
-              </p>
-            </div>
-            <div className="bg-zinc-900/30 border border-white/5 p-6 rounded-2xl backdrop-blur-sm hover:border-white/10 transition-colors">
-              <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider block mb-1">Entities Detected</span>
-              <p className="text-3xl font-extrabold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-                {activeCaseId ? entities.length : 0}
-              </p>
-            </div>
-            <div className="bg-zinc-900/30 border border-white/5 p-6 rounded-2xl backdrop-blur-sm hover:border-white/10 transition-colors">
-              <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider block mb-1">Link Connections</span>
-              <p className="text-3xl font-extrabold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-                {activeCaseId ? relationships.length : 0}
-              </p>
-            </div>
-            <div className="bg-zinc-900/30 border border-white/5 p-6 rounded-2xl backdrop-blur-sm hover:border-white/10 transition-colors">
-              <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider block mb-1">Threat Alerts</span>
-              <p className={`text-3xl font-extrabold ${activeCaseId && alerts.length > 0 ? "text-red-400" : "text-zinc-400"}`}>
-                {activeCaseId ? alerts.length : 0}
-              </p>
-            </div>
-          </div>
-
-          {/* Action Panels Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            {/* Column Left: Input Actions */}
-            <div className="flex flex-col gap-8">
-              
-              {/* Card 1: Ingest Evidence */}
-              {activeCaseId && (
-                <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-2xl">
-                  <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
-                    <span>📥</span> Ingest Case Evidence
-                  </h2>
-                  <p className="text-xs text-zinc-500 mb-6 leading-relaxed">
-                    Upload forensic evidence files (CSV tables, JSON collections, raw TXT logs, or PDFs). The NLP engine will parse records and add nodes to the active case.
-                  </p>
-
-                  <form onSubmit={handleUploadFile} className="flex flex-col gap-4">
-                    <input 
-                      id="file-input"
-                      type="file" 
-                      onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                      className="w-full text-zinc-400 text-sm bg-zinc-950/60 p-3 rounded-xl border border-white/10 focus:outline-none focus:border-blue-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600/10 file:text-blue-400 hover:file:bg-blue-600/20 cursor-pointer"
-                      required
-                    />
-                    <button 
-                      type="submit"
-                      disabled={uploading || !uploadFile}
-                      className="p-3 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-semibold text-sm active:scale-[0.98] transition-all"
-                    >
-                      {uploading ? "Parsing Document..." : "Upload and Extract Entities"}
-                    </button>
-                  </form>
-                </div>
-              )}
-
-              {/* Card 2: Create New Case */}
-              <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-2xl">
-                <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
-                  <span>📁</span> Create New Case File
-                </h2>
-                <form onSubmit={handleCreateCase} className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Case Name</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Case #2026-AR-09"
-                      value={newCaseName}
-                      onChange={(e) => setNewCaseName(e.target.value)}
-                      className="p-2.5 rounded-xl bg-zinc-950/60 border border-white/10 text-sm focus:outline-none focus:border-blue-500 placeholder-zinc-700"
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Description</label>
-                    <textarea 
-                      placeholder="Summary of suspect, entity networks, or operational coordinates..."
-                      value={newCaseDesc}
-                      onChange={(e) => setNewCaseDesc(e.target.value)}
-                      className="p-2.5 rounded-xl bg-zinc-950/60 border border-white/10 text-sm focus:outline-none focus:border-blue-500 placeholder-zinc-700 min-h-[90px]"
-                    />
-                  </div>
-                  <button 
-                    type="submit"
-                    className="p-3 bg-zinc-900 hover:bg-zinc-800 border border-white/10 hover:border-white/20 rounded-xl font-semibold text-sm transition-all"
-                  >
-                    Open Investigation File
-                  </button>
-                </form>
-              </div>
-
-            </div>
-
-            {/* Column Right: Case Alerts Timeline */}
-            <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-2xl flex flex-col min-h-[400px]">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
-                <span>🚨</span> Case Threat Alerts ({alerts.length})
-              </h2>
-              
-              {!activeCaseId ? (
-                <div className="flex-1 flex items-center justify-center text-zinc-600 text-sm italic">
-                  No active case selected.
-                </div>
-              ) : alerts.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                  <span className="text-3xl mb-3">🛡️</span>
-                  <p className="text-zinc-500 text-sm">No security threats detected.</p>
-                  <p className="text-xs text-zinc-600 mt-1">Run AI Risk Calculation to evaluate threat profiles.</p>
-                </div>
-              ) : (
-                <div className="flex-1 overflow-y-auto max-h-[440px] pr-2 space-y-3">
-                  {alerts.map((alert: any) => (
-                    <div key={alert._id} className="p-4 rounded-xl bg-zinc-950/60 border border-white/5 flex gap-3.5 items-start">
-                      <span className={`h-2.5 w-2.5 rounded-full mt-1.5 shrink-0 ${
-                        alert.severity === "HIGH" ? "bg-red-500 shadow-md shadow-red-500/50" : "bg-yellow-500"
-                      }`} />
-                      <div className="flex-1">
-                        <div className="flex justify-between items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            alert.severity === "HIGH" ? "bg-red-500/10 text-red-400 border border-red-500/15" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/15"
-                          }`}>
-                            {alert.type}
-                          </span>
-                          <span className="text-[10px] text-zinc-600">
-                            {new Date(alert.created_at).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <p className="text-sm text-zinc-400 mt-2 leading-relaxed">{alert.message}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-          </div>
-
-          {/* Bottom Panel: Detected Case Entities */}
-          {activeCaseId && (
-            <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-2xl">
-              <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-zinc-300">
-                <span>👥</span> Investigated Entity Directory ({entities.length})
-              </h2>
-
-              {entities.length === 0 ? (
-                <div className="p-12 text-center text-zinc-600 border border-dashed border-white/5 rounded-xl">
-                  No entities detected in this case file yet. Upload evidence data to extract profiles.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-sm text-zinc-400">
-                    <thead>
-                      <tr className="border-b border-white/5 text-zinc-500 text-xs font-semibold uppercase tracking-wider">
-                        <th className="py-3 px-4">Entity Profile Name</th>
-                        <th className="py-3 px-4">Classification</th>
-                        <th className="py-3 px-4 text-center">Threat Risk index</th>
-                        <th className="py-3 px-4">Ingestion Attributes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {entities.map((ent: any) => (
-                        <tr key={ent._id} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="py-3.5 px-4 font-bold text-white text-base">{ent.name}</td>
-                          <td className="py-3.5 px-4">
-                            <span className="px-2.5 py-1 text-xs rounded-full bg-zinc-900 border border-white/10 text-zinc-400">
-                              {ent.type}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
-                              ent.risk_score > 0.7 
-                                ? "bg-red-500/10 border-red-500/20 text-red-400 font-extrabold" 
-                                : ent.risk_score > 0.4 
-                                ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
-                                : "bg-blue-500/10 border-blue-500/20 text-blue-400"
-                            }`}>
-                              {(ent.risk_score || 0.0).toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-xs max-w-xs truncate text-zinc-500">
-                            {JSON.stringify(ent.properties || {})}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
         </div>
+
+        {/* MIDDLE ROW (LEFT AND RIGHT PANELS) */}
+        <div className="flex justify-between items-stretch flex-1 py-6">
+          
+          {/* LEFT PANEL */}
+          <div className="w-80 flex flex-col gap-4 pointer-events-auto">
+            {/* Active Cases */}
+            <div className="bg-[var(--surface-primary)]/80 backdrop-blur-md border border-[var(--border-primary)] rounded-xl p-4 shadow-xl flex flex-col gap-3 max-h-64 overflow-hidden hover:border-[var(--border-secondary)] transition-colors">
+              <h3 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider flex justify-between">
+                <span>Active Cases</span>
+                <span>{cases.length}</span>
+              </h3>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                {cases.map(c => (
+                  <Link href="/investigate" key={c._id} className="block p-2 rounded-lg bg-[var(--surface-secondary)]/50 hover:bg-[var(--surface-tertiary)] border border-transparent hover:border-[var(--border-primary)] transition-all">
+                    <p className="text-xs font-bold text-[var(--text-primary)] truncate">{c.name}</p>
+                    <p className="text-[10px] text-[var(--text-secondary)] font-mono mt-0.5">{c.status}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* High Risk Entities */}
+            <div className="flex-1 bg-[var(--surface-primary)]/80 backdrop-blur-md border border-[var(--border-primary)] rounded-xl p-4 shadow-xl flex flex-col gap-3 min-h-0">
+              <h3 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider flex justify-between">
+                <span>High Risk Targets</span>
+                <span className="text-[var(--danger)]">{highRiskEntities.filter(e => e.risk_score > 0.7).length} CRITICAL</span>
+              </h3>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                {highRiskEntities.map(ent => (
+                  <div key={ent.id} className="p-2.5 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border-primary)] flex items-center justify-between group cursor-pointer hover:border-[var(--danger)] transition-colors">
+                    <div className="truncate pr-2">
+                      <p className="text-xs font-bold text-[var(--text-primary)] truncate">{ent.name}</p>
+                      <p className="text-[10px] text-[var(--text-secondary)] truncate">{ent.type}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${ent.risk_score > 0.7 ? 'bg-[var(--danger)]/10 text-[var(--danger)] border-[var(--danger)]/20' : 'bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20'}`}>
+                      {(ent.risk_score || 0).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          {/* RIGHT PANEL */}
+          <div className="w-80 flex flex-col gap-4 pointer-events-auto items-end">
+            {/* Network Statistics */}
+            <div className="w-full bg-[var(--surface-primary)]/80 backdrop-blur-md border border-[var(--border-primary)] rounded-xl p-4 shadow-xl hover:border-[var(--border-secondary)] transition-colors">
+              <h3 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-4">Network Topology</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-[var(--surface-secondary)]/50 p-2.5 rounded-lg border border-[var(--border-primary)] text-center">
+                  <p className="text-xl font-black text-[var(--text-primary)]">{graphData.nodes.length}</p>
+                  <p className="text-[9px] text-[var(--text-secondary)] uppercase font-bold mt-1">Nodes</p>
+                </div>
+                <div className="bg-[var(--surface-secondary)]/50 p-2.5 rounded-lg border border-[var(--border-primary)] text-center">
+                  <p className="text-xl font-black text-[var(--text-primary)]">{graphData.links.length}</p>
+                  <p className="text-[9px] text-[var(--text-secondary)] uppercase font-bold mt-1">Edges</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Case Alerts */}
+            <div className="w-full flex-1 bg-[var(--surface-primary)]/80 backdrop-blur-md border border-[var(--border-primary)] rounded-xl p-4 shadow-xl flex flex-col gap-3 min-h-0">
+              <h3 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider flex justify-between">
+                <span>Recent Alerts</span>
+                <span>{alerts.length}</span>
+              </h3>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                {alerts.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-[10px] text-[var(--text-secondary)] uppercase font-bold">
+                    No active alerts
+                  </div>
+                ) : (
+                  alerts.slice(0, 8).map(alert => (
+                    <div key={alert._id} className="p-2.5 rounded-lg bg-[var(--surface-secondary)]/50 border border-[var(--border-primary)] border-l-2 border-l-[var(--danger)]">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase">{alert.type}</span>
+                        <span className="text-[9px] text-[var(--text-tertiary)]">{new Date(alert.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      </div>
+                      <p className="text-xs text-[var(--text-primary)] leading-tight">{alert.message}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* BOTTOM ROW */}
+        <div className="flex justify-center pointer-events-auto">
+          <div className="bg-[var(--surface-primary)]/90 backdrop-blur-md border border-[var(--border-primary)] rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-6">
+            <Link href="/investigate" className="flex flex-col items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--primary-accent)] transition-colors">
+              <span className="text-xl">🔍</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Investigate</span>
+            </Link>
+            <div className="w-px h-8 bg-[var(--border-primary)]"></div>
+            <Link href="/reports" className="flex flex-col items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+              <span className="text-xl">📊</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Reports</span>
+            </Link>
+            <div className="w-px h-8 bg-[var(--border-primary)]"></div>
+            <Link href="/risk" className="flex flex-col items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--danger)] transition-colors">
+              <span className="text-xl">⚠️</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Risk Dash</span>
+            </Link>
+            <div className="w-px h-8 bg-[var(--border-primary)]"></div>
+            <button className="flex items-center gap-3 bg-[var(--primary-accent)] hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl shadow-lg transition-transform active:scale-95 ml-4">
+              <span className="font-bold text-sm tracking-wide">Command Palette</span>
+              <span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded font-mono">Ctrl K</span>
+            </button>
+          </div>
+        </div>
+        
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import networkx as nx
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Any, Dict
 from app.core.database import get_database
@@ -5,6 +6,63 @@ from app.api.routes.auth import get_current_user
 from app.graph.graph_builder import build_graph, get_graph_data_for_frontend
 
 router = APIRouter()
+
+@router.get("/global", response_model=Dict[str, Any])
+async def get_global_network(db=Depends(get_database), current_user=Depends(get_current_user)):
+    cases = await db["cases"].find({}).to_list(None)
+    case_map = {str(c["_id"]): c["name"] for c in cases}
+    
+    entities = await db["entities"].find({}).to_list(None)
+    relationships = await db["relationships"].find({}).to_list(None)
+    
+    # Deduplicate entities by name and type
+    unique_entities = {}
+    entity_id_map = {} # Maps original ID to canonical ID
+    
+    for ent in entities:
+        ent_id = str(ent["_id"])
+        key = (ent.get("type", "PERSON").upper(), ent.get("name", "").strip().lower())
+        case_name = case_map.get(ent.get("case_id"), "Unknown Case")
+        
+        if key not in unique_entities:
+            canonical_id = ent_id
+            ent_copy = dict(ent)
+            ent_copy["_id"] = canonical_id
+            ent_copy["cases"] = [case_name]
+            unique_entities[key] = ent_copy
+            entity_id_map[ent_id] = canonical_id
+        else:
+            canonical_id = unique_entities[key]["_id"]
+            entity_id_map[ent_id] = canonical_id
+            if case_name not in unique_entities[key]["cases"]:
+                unique_entities[key]["cases"].append(case_name)
+                
+    # Build graph with canonical entities
+    G = nx.Graph()
+    for ent in unique_entities.values():
+        G.add_node(
+            ent["_id"],
+            type=ent.get("type"),
+            name=ent.get("name"),
+            risk_score=ent.get("risk_score", 0),
+            cases=ent.get("cases", [])
+        )
+        
+    for rel in relationships:
+        source_canonical = entity_id_map.get(str(rel.get("source_entity_id")))
+        target_canonical = entity_id_map.get(str(rel.get("target_entity_id")))
+        
+        if source_canonical and target_canonical:
+            if source_canonical != target_canonical:
+                G.add_edge(
+                    source_canonical,
+                    target_canonical,
+                    type=rel.get("type"),
+                    rel_id=str(rel.get("_id", rel.get("id")))
+                )
+                
+    graph_data = get_graph_data_for_frontend(G)
+    return graph_data
 
 @router.get("/{case_id}", response_model=Dict[str, Any])
 async def get_network(case_id: str, db=Depends(get_database), current_user=Depends(get_current_user)):

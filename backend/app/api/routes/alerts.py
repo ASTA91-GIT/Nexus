@@ -98,3 +98,87 @@ async def update_alert_status(
         
     await db["alerts"].update_one({"_id": oid}, {"$set": {"status": status.upper()}})
     return {"message": f"Alert status updated to {status.upper()}"}
+
+@router.get("/anomalies/{case_id}")
+async def get_anomalies(case_id: str, db=Depends(get_database), current_user=Depends(get_current_user)):
+    entities = await db["entities"].find({"case_id": case_id}).to_list(None)
+    relationships = await db["relationships"].find({"case_id": case_id}).to_list(None)
+    
+    anomalies = []
+    
+    for rel in relationships:
+        if rel.get("type") == "TRANSFERRED_MONEY":
+            props = rel.get("properties", {})
+            amount = props.get("amount", 0)
+            if amount > 10000:
+                src_ent = next((e for e in entities if str(e["_id"]) == str(rel["source_entity_id"])), None)
+                tgt_ent = next((e for e in entities if str(e["_id"]) == str(rel["target_entity_id"])), None)
+                src_name = src_ent["name"] if src_ent else "Unknown"
+                tgt_name = tgt_ent["name"] if tgt_ent else "Unknown"
+                
+                anomalies.append({
+                    "id": str(rel["_id"]),
+                    "category": "Financial",
+                    "severity": "HIGH" if amount > 50000 else "MEDIUM",
+                    "entity": src_name,
+                    "reason": f"High value fund transfer detected: {src_name} sent ${amount:,} to {tgt_name}.",
+                    "timestamp": rel.get("created_at") or datetime.utcnow(),
+                    "evidence": [f"Transaction ID: {rel['_id']}"]
+                })
+                
+    for rel in relationships:
+        if rel.get("type") in ["CALLED", "MESSAGED"]:
+            props = rel.get("properties", {})
+            duration = props.get("duration_seconds", 0)
+            timestamp = props.get("timestamp")
+            
+            is_odd_hour = False
+            time_str = ""
+            if timestamp:
+                try:
+                    dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    time_str = dt.strftime("%H:%M:%S")
+                    if dt.hour < 6 or dt.hour > 22:
+                        is_odd_hour = True
+                except Exception:
+                    pass
+            
+            if duration > 1800 or is_odd_hour:
+                src_ent = next((e for e in entities if str(e["_id"]) == str(rel["source_entity_id"])), None)
+                tgt_ent = next((e for e in entities if str(e["_id"]) == str(rel["target_entity_id"])), None)
+                src_name = src_ent["name"] if src_ent else "Unknown"
+                tgt_name = tgt_ent["name"] if tgt_ent else "Unknown"
+                
+                reason = ""
+                if duration > 1800 and is_odd_hour:
+                    reason = f"Extremely long call ({duration // 60} min) at odd hours ({time_str}) detected between {src_name} and {tgt_name}."
+                elif duration > 1800:
+                    reason = f"Extremely long call ({duration // 60} min) detected between {src_name} and {tgt_name}."
+                else:
+                    reason = f"Odd hour communication ({time_str}) detected between {src_name} and {tgt_name}."
+                    
+                anomalies.append({
+                    "id": str(rel["_id"]),
+                    "category": "Communication",
+                    "severity": "HIGH" if duration > 3600 else "MEDIUM",
+                    "entity": src_name,
+                    "reason": reason,
+                    "timestamp": rel.get("created_at") or datetime.utcnow(),
+                    "evidence": [f"Call Record: {rel['_id']}"]
+                })
+                
+    for ent in entities:
+        risk = ent.get("risk_score", 0.0)
+        if risk > 0.8:
+            anomalies.append({
+                "id": str(ent["_id"]),
+                "category": "Activity",
+                "severity": "HIGH",
+                "entity": ent["name"],
+                "reason": f"Suspect '{ent['name']}' has an elevated threat risk score of {risk:.2f}.",
+                "timestamp": ent.get("updated_at") or datetime.utcnow(),
+                "evidence": [f"Risk Assessment: {risk:.2f}"]
+            })
+            
+    anomalies.sort(key=lambda x: x["timestamp"], reverse=True)
+    return anomalies
