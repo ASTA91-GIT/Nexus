@@ -181,7 +181,11 @@ export default function NetworkPage() {
 
       {/* 3D Canvas Visualizer */}
       <main className="flex-1 relative bg-black/80">
-        {loading ? (
+        {!activeCaseId ? (
+          <div className="absolute inset-0 flex items-center justify-center text-zinc-600 text-sm italic z-20 bg-zinc-950/80 backdrop-blur-sm">
+            Please select an active Case File from the sidebar to visualize the 3D network topology.
+          </div>
+        ) : loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             <span className="text-sm text-zinc-500">Rendering 3D graph structures...</span>

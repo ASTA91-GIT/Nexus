@@ -150,7 +150,7 @@ export default function InvestigatePage() {
   const handlePredictSuspects = () => {
     const victim = entities.find(e => e._id === wkwVictimId);
     if (!victim) return;
-    callAI(`Who killed or targeted ${victim.name}? Analyze all connections and predict top suspects.`, setWkwResult, setWkwPredicting);
+    callAI(`Who killed ${victim.name}?`, setWkwResult, setWkwPredicting);
   };
 
   const handleGenerateStory = () => {

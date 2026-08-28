@@ -181,6 +181,93 @@ async def run_ai_investigator(query: str, case_id: str, db) -> Dict[str, Any]:
             "supporting_evidence": [e["name"] for e in high_risk_ents]
         }
 
+    # 3.5 INTENT DETECT: Who Killed / Who Ordered / Who Financed
+    killed_match = re.search(r"who\s+(?:killed|murdered|assassinated)\s+([a-zA-Z\s\?]+)", query_lower)
+    ordered_match = re.search(r"who\s+(?:ordered|planned)\s+(?:the\s+(?:killing|murder|assassination)\s+of\s+)?([a-zA-Z\s\?]+)", query_lower)
+    financed_match = re.search(r"who\s+(?:financed|paid\s+for|funded)\s+(?:the\s+(?:killing|murder|assassination)\s+of\s+)?([a-zA-Z\s\?]+)", query_lower)
+    
+    intent_match = None
+    rel_type = None
+    target_name = None
+    
+    if killed_match:
+        intent_match = killed_match
+        rel_type = "KILLED"
+    elif ordered_match:
+        intent_match = ordered_match
+        rel_type = "ORDERED"
+    elif financed_match:
+        intent_match = financed_match
+        rel_type = "FINANCED"
+        
+    if intent_match:
+        target_name = intent_match.group(1).strip().replace("?", "")
+        target_ent = next((e for e in entities if target_name in e["name"].lower()), None)
+        
+        if not target_ent:
+            scope_text = "database" if case_id == "all" else "case directory"
+            return {
+                "answer": f"I couldn't locate '{target_name}' in the {scope_text}. Please verify the name.",
+                "actions": [],
+                "supporting_evidence": []
+            }
+            
+        target_id_str = str(target_ent["_id"])
+        
+        # Find relationships pointing to the target with rel_type
+        relevant_rels = []
+        for r in relationships:
+            # We want source -> target where target is target_ent and type matches, or type is similar
+            # For ordered/financed, we might need a longer chain, but let's check direct first
+            t_id = str(r.get("target_entity_id"))
+            if t_id == target_id_str and r.get("type", "").upper() == rel_type:
+                relevant_rels.append(r)
+                
+        # If no direct rel, let's search for chains if it's ordered/financed (e.g. A->ORDERED->B->KILLED->Target)
+        if not relevant_rels and rel_type in ["ORDERED", "FINANCED"]:
+            # Find who killed the target
+            killers = [r.get("source_entity_id") for r in relationships if str(r.get("target_entity_id")) == target_id_str and r.get("type", "").upper() == "KILLED"]
+            for killer_id in killers:
+                # Find who ordered/financed the killer
+                indirect_rels = [r for r in relationships if str(r.get("target_entity_id")) == str(killer_id) and r.get("type", "").upper() == rel_type]
+                relevant_rels.extend(indirect_rels)
+
+        if not relevant_rels:
+            scope_text = "across cases" if case_id == "all" else "in this case"
+            return {
+                "answer": f"Analysis complete: No records found indicating who {rel_type.lower()} '{target_ent['name']}' {scope_text}.",
+                "actions": [],
+                "supporting_evidence": []
+            }
+            
+        # Compile actors
+        actors = []
+        entity_map = {str(e["_id"]): e for e in unique_entities.values()} if case_id == "all" else {str(e["_id"]): e for e in entities}
+        
+        for r in relevant_rels:
+            source_id = str(r.get("source_entity_id"))
+            source_ent = entity_map.get(source_id)
+            if source_ent:
+                status = r.get("status", "CONFIRMED")
+                actors.append(f"{source_ent['name']} ({status})")
+                
+        actors_str = ", ".join(actors)
+        grounding_context = f"Entities who {rel_type.lower()} {target_ent['name']}: {actors_str}."
+        
+        prompt = f"System: You are NEXUS Forensic AI. Report the findings based strictly on the facts.\nFact: {grounding_context}\nQuestion: {query}\nAnswer:"
+        answer = call_hf_api(prompt)
+        if not answer:
+            answer = f"The following entities are recorded as having {rel_type.lower()} {target_ent['name']}: {actors_str}."
+            
+        action_node = str(relevant_rels[0].get("source_entity_id")) if relevant_rels else target_id_str
+        node_id_to_focus = entity_id_map.get(action_node, action_node) if case_id == "all" else action_node
+        
+        return {
+            "answer": answer,
+            "actions": [{"type": "FOCUS_NODE", "node_id": node_id_to_focus, "scope": case_id}],
+            "supporting_evidence": [f"{rel_type} -> {target_ent['name']}"]
+        }
+
     # 4. DEFAULT: General Case Summary facts
     if case_id == "all":
         suspects_count = len(unique_entities)

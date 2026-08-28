@@ -178,6 +178,13 @@ export default function RiskDashboard() {
                           <div>
                             <p className="font-bold text-[var(--text-primary)] text-sm">{ent.name}</p>
                             <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">{ent.type}</p>
+                            
+                            {/* Display Risk Factors based on actual data */}
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {ent.risk_score > 0.7 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--danger)]/10 text-[var(--danger)] font-mono">High assigned threat score</span>}
+                              {ent.properties && Object.keys(ent.properties).length > 2 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] font-mono">Multiple flagged attributes</span>}
+                              {ent.type === "ORGANIZATION" && ent.risk_score > 0.5 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--info)]/10 text-[var(--info)] font-mono">Suspicious organization</span>}
+                            </div>
                           </div>
                         </div>
                         
