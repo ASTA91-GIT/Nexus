@@ -6,9 +6,11 @@ class Settings(BaseSettings):
     DATABASE_NAME: str = "nexus"
     JWT_SECRET: str = "supersecretkey"
     HUGGINGFACE_API_KEY: str = ""
+    FRONTEND_URL: str = "http://localhost:3000"
     
     class Config:
-        env_file = ".env"
+        env_file = (".env", "../.env")
+        extra = "ignore"
 
 settings = Settings()
 

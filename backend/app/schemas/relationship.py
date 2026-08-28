@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+from app.models.user import PyObjectId
 
 class RelationshipBase(BaseModel):
     case_id: str
@@ -14,7 +15,7 @@ class RelationshipCreate(RelationshipBase):
     pass
 
 class RelationshipOut(RelationshipBase):
-    id: str = Field(alias="_id")
+    id: PyObjectId = Field(alias="_id")
     created_by: str
     created_at: datetime
     updated_at: datetime

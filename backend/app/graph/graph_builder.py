@@ -29,4 +29,11 @@ def build_graph(entities: List[Dict], relationships: List[Dict]) -> nx.Graph:
 def get_graph_data_for_frontend(G: nx.Graph) -> Dict:
     from networkx.readwrite import json_graph
     data = json_graph.node_link_data(G)
+    if "edges" in data and "links" not in data:
+        data["links"] = [{
+            "source": edge["source"],
+            "target": edge["target"],
+            "type": edge.get("type"),
+            "rel_id": edge.get("rel_id")
+        } for edge in data["edges"]]
     return data

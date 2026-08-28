@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from app.models.user import PyObjectId
 
 class EvidenceBase(BaseModel):
     case_id: str
@@ -13,6 +14,6 @@ class EvidenceCreate(EvidenceBase):
     pass
 
 class EvidenceOut(EvidenceBase):
-    id: str = Field(alias="_id")
+    id: PyObjectId = Field(alias="_id")
     created_by: str
     created_at: datetime

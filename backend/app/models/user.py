@@ -1,22 +1,41 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 from bson import ObjectId
+from pydantic_core import core_schema
 
-class PyObjectId(ObjectId):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+class PyObjectId(str):
+    def __new__(cls, val=None):
+        if val is None:
+            val = ObjectId()
+        elif isinstance(val, ObjectId):
+            val = str(val)
+        elif not ObjectId.is_valid(val):
+            raise ValueError("Invalid ObjectId")
+        return super().__new__(cls, val)
 
     @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid objectid")
-        return ObjectId(v)
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: Any
+    ) -> core_schema.CoreSchema:
+        return core_schema.json_or_python_schema(
+            json_schema=core_schema.str_schema(),
+            python_schema=core_schema.with_info_plain_validator_function(cls.validate),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda val: str(val),
+                when_used='always'
+            )
+        )
 
     @classmethod
-    def __modify_schema__(cls, field_schema):
-        field_schema.update(type="string")
+    def validate(cls, v: Any, info: Any) -> str:
+        if isinstance(v, ObjectId):
+            return str(v)
+        if isinstance(v, str):
+            if not ObjectId.is_valid(v):
+                raise ValueError("Invalid ObjectId")
+            return v
+        raise ValueError("Invalid ObjectId")
 
 class User(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
@@ -27,7 +46,7 @@ class User(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = {
+        "populate_by_name": True,
+        "arbitrary_types_allowed": True
+    }
