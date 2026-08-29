@@ -2,59 +2,145 @@
 
 /* Base fonts (Outfit and JetBrains Mono) are imported in layout.tsx via next/font */
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  /* LIGHT MODE (DEFAULT IF NOT OVERRIDDEN) */
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  /* LIGHT MODE (Clean, Professional Dashboard) */
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+
+  --surface-primary: #FFFFFF;
+  --surface-secondary: #F1F5F9;
+  --surface-tertiary: #E2E8F0;
+
+  --border-primary: #CBD5E1;
+  --border-secondary: #E2E8F0;
+  --border: #CBD5E1;
   
-  --surface-primary: #ffffff;
-  --surface-secondary: #f1f5f9;
-  --surface-tertiary: #e2e8f0;
+  --secondary-bg: #FFFFFF;
+  --card-bg: #FFFFFF;
+  --elevated-panel: #F8FAFC;
   
-  --border-primary: #cbd5e1;
-  --border-secondary: #e2e8f0;
+  --primary: #2563EB;
+  --secondary: #0891B2;
+  --success: #059669;
+  --warning: #D97706;
+  --danger: #DC2626;
   
-  --primary-accent: #2563eb;
-  --primary-hover: #1d4ed8;
-  
-  --text-primary: #0f172a;
+  --text-primary: #0F172A;
   --text-secondary: #475569;
-  --text-tertiary: #64748b;
-  
-  --danger: #ef4444;
-  --warning: #f59e0b;
-  --success: #10b981;
+  --text-tertiary: #64748B;
 }
 
-html.dark {
-  /* DARK MODE */
-  --background: #09090b;
-  --foreground: #fafafa;
+.dark {
+  /* DARK MODE (Current Intelligence Aesthetic) */
+  --background: #070B14;
+  --foreground: #F8FAFC;
+
+  --surface-primary: #0D1321;
+  --surface-secondary: #111827;
+  --surface-tertiary: #161F2E;
+
+  --border-primary: #243047;
+  --border-secondary: #1E293B;
+  --border: #243047;
   
-  --surface-primary: #18181b;
-  --surface-secondary: #27272a;
-  --surface-tertiary: #3f3f46;
+  --secondary-bg: #0D1321;
+  --card-bg: #111827;
+  --elevated-panel: #161F2E;
   
-  --border-primary: #3f3f46;
-  --border-secondary: #27272a;
+  --primary: #3B82F6;
+  --secondary: #06B6D4;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
   
-  --primary-accent: #3b82f6;
-  --primary-hover: #2563eb;
-  
-  --text-primary: #fafafa;
-  --text-secondary: #a1a1aa;
-  --text-tertiary: #71717a;
-  
-  --danger: #f87171;
-  --warning: #fbbf24;
-  --success: #34d399;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-tertiary: #64748B;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+body {
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Scrollbar styling for a professional look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Shared utility classes */
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.input-field {
+  background-color: var(--elevated-panel);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+.btn-primary:hover {
+  background-color: #2563EB;
+}
+
+.btn-secondary {
+  background-color: var(--elevated-panel);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+.btn-secondary:hover {
+  background-color: var(--border);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  *, *::before, *::after {
+    transition-property: background-color, border-color, color, text-decoration-color, box-shadow;
+    transition-duration: 0.25s;
+    transition-timing-function: ease;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {

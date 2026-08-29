@@ -11,16 +11,39 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+import re
+
+def validate_password(password: str):
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter."
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one number."
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False, "Password must contain at least one special character."
+    return True, ""
+
 @router.post("/register", response_model=UserOut)
 async def register_user(user: UserCreate, db=Depends(get_database)):
     if await db["users"].find_one({"email": user.email}):
         raise HTTPException(status_code=400, detail="Email already registered")
+        
+    is_valid, msg = validate_password(user.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=msg)
     
     user_dict = user.dict()
     user_dict["hashed_password"] = get_password_hash(user_dict.pop("password"))
     from datetime import datetime
     user_dict["created_at"] = datetime.utcnow()
     user_dict["updated_at"] = datetime.utcnow()
+    
+    user_count = await db["users"].count_documents({})
+    if user_count == 0:
+        user_dict["role"] = "ADMIN"
+    else:
+        user_dict["role"] = "INVESTIGATOR"
     
     result = await db["users"].insert_one(user_dict)
     created_user = await db["users"].find_one({"_id": result.inserted_id})
@@ -38,7 +61,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user["email"]}, expires_delta=access_token_expires
+        data={"sub": user["email"], "role": user.get("role", "USER")}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -62,3 +85,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_d
     if user is None:
         raise credentials_exception
     return user
+
+async def get_admin_user(current_user=Depends(get_current_user)):
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+    return current_user
+
+@router.get("/me", response_model=UserOut)
+async def read_users_me(current_user=Depends(get_current_user)):
+    return current_user

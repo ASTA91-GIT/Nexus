@@ -1,10 +1,42 @@
 "use client";
-import React, { useRef, useMemo, useEffect, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Text } from "@react-three/drei";
+import { Line, OrbitControls, Text, DragControls } from "@react-three/drei";
 import * as THREE from "three";
 
-interface NodeProps {
+function linkEndpointId(value: unknown): string {
+  if (value && typeof value === "object") {
+    const obj = value as { id?: string; _id?: string };
+    return String(obj.id ?? obj._id ?? "");
+  }
+  return String(value ?? "");
+}
+
+function fibonacciSphere(count: number, radius: number): [number, number, number][] {
+  if (count <= 0) return [];
+  if (count === 1) return [[0, 0, 0]];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  return Array.from({ length: count }, (_, i) => {
+    const y = 1 - (i / (count - 1)) * 2;
+    const r = Math.sqrt(Math.max(0, 1 - y * y)) * radius;
+    const theta = golden * i;
+    return [Math.cos(theta) * r, y * radius * 0.85, Math.sin(theta) * r];
+  });
+}
+
+function NetworkNode({
+  position,
+  color,
+  name,
+  type,
+  riskScore,
+  highlighted,
+  dimmed,
+  onClick,
+  isEditMode,
+  onNodeDragEnd,
+  id
+}: {
   position: [number, number, number];
   color: string;
   name: string;
@@ -13,156 +45,165 @@ interface NodeProps {
   highlighted: boolean;
   dimmed: boolean;
   onClick?: () => void;
-}
-
-function NetworkNode({ position, color, name, type, riskScore, highlighted, dimmed, onClick }: NodeProps) {
+  isEditMode?: boolean;
+  onNodeDragEnd?: (id: string, x: number, y: number, z: number) => void;
+  id: string;
+}) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const isSuspicious = riskScore > 0.6 || type === "ALERT" || type === "HIGH_RISK";
-  
-  const baseSize = isSuspicious ? 1.4 : 0.9;
-  const size = hovered ? baseSize * 1.3 : baseSize;
+  const baseSize = isSuspicious ? 1.15 : 0.75;
+  const size = hovered ? baseSize * 1.25 : baseSize;
 
   useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y = state.clock.getElapsedTime() * 0.3;
-      if (isSuspicious) {
-        const pulse = 1 + Math.sin(state.clock.getElapsedTime() * 4) * 0.05;
-        meshRef.current.scale.setScalar(pulse);
-      }
+    if (!meshRef.current) return;
+    meshRef.current.rotation.y = state.clock.getElapsedTime() * 0.25;
+    if (isSuspicious) {
+      const pulse = 1 + Math.sin(state.clock.getElapsedTime() * 3.5) * 0.06;
+      meshRef.current.scale.setScalar(pulse);
     }
   });
 
   useEffect(() => {
-    document.body.style.cursor = hovered ? "pointer" : "auto";
-    return () => { document.body.style.cursor = "auto"; };
-  }, [hovered]);
+    document.body.style.cursor = hovered ? (isEditMode ? "grab" : "pointer") : "auto";
+    return () => {
+      document.body.style.cursor = "auto";
+    };
+  }, [hovered, isEditMode]);
 
-  const opacity = dimmed ? 0.15 : 1.0;
+  const opacity = dimmed ? 0.18 : 1;
 
-  return (
-    <group 
-      position={position}
-      onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
-      onPointerOut={(e) => { e.stopPropagation(); setHovered(false); }}
-      onClick={(e) => { e.stopPropagation(); onClick && onClick(); }}
+  const nodeContent = (
+    <group
+      position={isEditMode ? undefined : position}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setHovered(true);
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        setHovered(false);
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
     >
       <mesh ref={meshRef}>
-        <sphereGeometry args={[size, 32, 32]} />
-        <meshStandardMaterial 
-          color={color} 
-          roughness={0.2}
-          metalness={0.8}
-          emissive={highlighted ? color : (isSuspicious ? color : "#000")}
-          emissiveIntensity={highlighted ? 0.8 : (hovered ? 0.6 : isSuspicious ? 0.3 : 0.1)}
+        <sphereGeometry args={[size, 24, 24]} />
+        <meshStandardMaterial
+          color={color}
+          roughness={0.25}
+          metalness={0.7}
+          emissive={highlighted || isSuspicious ? color : "#000000"}
+          emissiveIntensity={highlighted ? 0.85 : hovered ? 0.55 : isSuspicious ? 0.35 : 0.08}
           transparent
           opacity={opacity}
         />
       </mesh>
-      
-      {/* Halo for high risk or highlighted nodes */}
       {(isSuspicious || highlighted) && (
         <mesh>
-          <sphereGeometry args={[size * 1.25, 16, 16]} />
-          <meshBasicMaterial 
-            color={highlighted ? "#3b82f6" : "#ef4444"} 
-            transparent 
-            opacity={dimmed ? 0.05 : 0.25} 
+          <sphereGeometry args={[size * 1.3, 12, 12]} />
+          <meshBasicMaterial
+            color={highlighted ? "#3b82f6" : "#ef4444"}
+            transparent
+            opacity={dimmed ? 0.05 : 0.22}
             wireframe
           />
         </mesh>
       )}
-
       {(!dimmed || hovered) && (
         <Text
-          position={[0, baseSize + 0.8, 0]}
-          fontSize={0.55}
-          color={hovered ? "#60a5fa" : highlighted ? "#fff" : "#cbd5e1"}
+          position={[0, baseSize + 0.7, 0]}
+          fontSize={0.42}
+          color={hovered ? "#93c5fd" : highlighted ? "#ffffff" : "#e2e8f0"}
           anchorX="center"
           anchorY="middle"
-          font="https://fonts.gstatic.com/s/outfit/v11/F3wUip1xM2pq85mwGGk.woff"
-          fillOpacity={opacity}
+          outlineWidth={0.02}
+          outlineColor="#020617"
         >
           {name}
         </Text>
       )}
     </group>
   );
-}
 
-function NetworkEdge({ start, end, label, status, highlighted, dimmed }: { start: THREE.Vector3; end: THREE.Vector3; label: string; status: string; highlighted: boolean; dimmed: boolean }) {
-  const ref = useRef<THREE.Line>(null);
-  const points = useMemo(() => [start, end], [start, end]);
-  
-  useEffect(() => {
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    if (ref.current) {
-      ref.current.geometry = geometry;
-    }
-    return () => { geometry.dispose(); };
-  }, [points]);
-
-  const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-  const direction = new THREE.Vector3().subVectors(end, start).normalize();
-  
-  // Calculate orientation for the cone to point along the edge
-  const arrowQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-
-  // Edge styling based on status and highlight
-  let color = "#475569";
-  let opacity = dimmed ? 0.1 : 0.4;
-  let lineWidth = 1.5;
-  let isDashed = false;
-
-  if (highlighted) {
-    color = "#3b82f6"; // bright blue
-    opacity = 1.0;
-    lineWidth = 3.0;
-  } else if (!dimmed) {
-    if (status === "CONFIRMED") {
-      color = "#94a3b8"; // solid light grey
-      opacity = 0.6;
-    } else if (status === "INFERRED") {
-      color = "#64748b";
-      opacity = 0.4;
-      isDashed = true;
-    } else if (status === "PREDICTED") {
-      color = "#f59e0b"; // amber for predicted
-      opacity = 0.6;
-      isDashed = true;
-    }
+  if (isEditMode) {
+    return (
+      <group position={position}>
+        <DragControls
+          autoTransform
+          onDragStart={() => { document.body.style.cursor = "grabbing"; }}
+          onDragEnd={() => {
+            document.body.style.cursor = "grab";
+            if (meshRef.current) {
+              const pos = new THREE.Vector3();
+              meshRef.current.getWorldPosition(pos);
+              onNodeDragEnd?.(id, pos.x, pos.y, pos.z);
+            }
+          }}
+        >
+          {nodeContent}
+        </DragControls>
+      </group>
+    );
   }
 
+  return nodeContent;
+}
+
+function NetworkEdge({
+  start,
+  end,
+  label,
+  highlighted,
+  dimmed,
+  onClick,
+}: {
+  start: THREE.Vector3;
+  end: THREE.Vector3;
+  label: string;
+  highlighted: boolean;
+  dimmed: boolean;
+  onClick?: () => void;
+}) {
+  const midPoint = useMemo(
+    () => new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5),
+    [start, end]
+  );
+  const color = highlighted ? "#60a5fa" : dimmed ? "#334155" : "#94a3b8";
+  const opacity = highlighted ? 1 : dimmed ? 0.12 : 0.55;
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (onClick) {
+      document.body.style.cursor = hovered ? "pointer" : "auto";
+      return () => { document.body.style.cursor = "auto"; };
+    }
+  }, [hovered, onClick]);
+
   return (
-    <group>
-      {/* Edge Line */}
-      {/* @ts-ignore */}
-      <line ref={ref}>
-        {isDashed ? (
-          <lineDashedMaterial color={color} opacity={opacity} transparent linewidth={lineWidth} dashSize={1} gapSize={1} />
-        ) : (
-          <lineBasicMaterial color={color} opacity={opacity} transparent linewidth={lineWidth} />
-        )}
-      </line>
-
-      {/* Directional Arrow (Cone) */}
-      {(!dimmed || highlighted) && (
-        <mesh position={midPoint} quaternion={arrowQuaternion}>
-          <coneGeometry args={[0.3, 0.8, 8]} />
-          <meshBasicMaterial color={color} opacity={opacity + 0.2} transparent />
-        </mesh>
-      )}
-
-      {/* Edge Label */}
+    <group 
+      onPointerOver={(e) => { if(onClick) { e.stopPropagation(); setHovered(true); } }}
+      onPointerOut={(e) => { if(onClick) { e.stopPropagation(); setHovered(false); } }}
+      onClick={(e) => { if (onClick) { e.stopPropagation(); onClick(); } }}
+    >
+      <Line
+        points={[start, end]}
+        color={hovered ? "#ffffff" : color}
+        lineWidth={highlighted ? 2.5 : 1.2}
+        transparent
+        opacity={opacity}
+      />
       {(!dimmed || highlighted) && (
         <Text
-          position={[midPoint.x, midPoint.y + 0.5, midPoint.z]}
-          fontSize={0.4}
+          position={[midPoint.x, midPoint.y + 0.35, midPoint.z]}
+          fontSize={0.28}
           color={color}
           anchorX="center"
           anchorY="middle"
-          font="https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKwI.woff"
-          fillOpacity={opacity + 0.3}
+          outlineWidth={0.015}
+          outlineColor="#020617"
         >
           {label}
         </Text>
@@ -171,123 +212,158 @@ function NetworkEdge({ start, end, label, status, highlighted, dimmed }: { start
   );
 }
 
-export default function NetworkScene({ data, onNodeClick, highlightedPath = [] }: { data: any; onNodeClick?: (node: any) => void; highlightedPath?: string[] }) {
+export default function NetworkScene({
+  data,
+  onNodeClick,
+  onEdgeClick,
+  highlightedPath = [],
+  isEditMode = false,
+  onNodeDragEnd,
+  draggedPositions = {}
+}: {
+  data: any;
+  onNodeClick?: (node: any) => void;
+  onEdgeClick?: (edge: any) => void;
+  highlightedPath?: string[];
+  isEditMode?: boolean;
+  onNodeDragEnd?: (id: string, x: number, y: number, z: number) => void;
+  draggedPositions?: Record<string, {x: number, y: number, z: number}>;
+}) {
   const nodes = useMemo(() => {
-    if (!data || !data.nodes) return [];
-    
-    const seededRandom = (str: string) => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    const rawNodes = data?.nodes || [];
+    const positions = fibonacciSphere(rawNodes.length, 16);
+    return rawNodes.map((node: any, index: number) => {
+      const idStr = String(node.id ?? node._id ?? index);
+      
+      let pos = positions[index];
+      if (draggedPositions[idStr]) {
+        pos = [draggedPositions[idStr].x, draggedPositions[idStr].y, draggedPositions[idStr].z];
+      } else if (node.position && typeof node.position.x === 'number') {
+        pos = [node.position.x, node.position.y, node.position.z];
       }
-      const x = Math.sin(hash++) * 10000;
-      return x - Math.floor(x);
-    };
-
-    return data.nodes.map((node: any) => {
-      const idStr = String(node.id);
+      
       return {
         ...node,
-        position: [
-          (seededRandom(idStr + "x") - 0.5) * 45,
-          (seededRandom(idStr + "y") - 0.5) * 45,
-          (seededRandom(idStr + "z") - 0.5) * 35
-        ]
+        id: idStr,
+        position: pos,
       };
     });
-  }, [data]);
+  }, [data, draggedPositions]);
+
+  const nodeById = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const node of nodes) map.set(node.id, node);
+    return map;
+  }, [nodes]);
 
   const edges = useMemo(() => {
-    const rawLinks = data ? (data.links || data.edges) : null;
-    if (!data || !rawLinks || nodes.length === 0) return [];
-    return rawLinks.map((link: any) => {
-      const sourceNode = nodes.find((n: any) => n.id === link.source);
-      const targetNode = nodes.find((n: any) => n.id === link.target);
-      if (!sourceNode || !targetNode) return null;
-      
-      const props = link.properties || {};
-      const status = (props.status || props.confidence || "UNKNOWN").toUpperCase();
+    const rawLinks = data?.links || data?.edges || [];
+    const path = (highlightedPath || []).map(String);
+    return rawLinks
+      .map((link: any, index: number) => {
+        const sourceId = linkEndpointId(link.source);
+        const targetId = linkEndpointId(link.target);
+        const sourceNode = nodeById.get(sourceId);
+        const targetNode = nodeById.get(targetId);
+        if (!sourceNode || !targetNode) return null;
 
-      // Check if both nodes are in the highlighted path and they are adjacent in the path
-      let isHighlighted = false;
-      if (highlightedPath.length > 1) {
-        for (let i = 0; i < highlightedPath.length - 1; i++) {
+        let isHighlighted = false;
+        for (let i = 0; i < path.length - 1; i++) {
           if (
-            (highlightedPath[i] === link.source && highlightedPath[i+1] === link.target) ||
-            (highlightedPath[i] === link.target && highlightedPath[i+1] === link.source)
+            (path[i] === sourceId && path[i + 1] === targetId) ||
+            (path[i] === targetId && path[i + 1] === sourceId)
           ) {
             isHighlighted = true;
             break;
           }
         }
-      }
-      
-      return {
-        start: new THREE.Vector3(...sourceNode.position),
-        end: new THREE.Vector3(...targetNode.position),
-        id: link.rel_id || link.id || Math.random().toString(),
-        label: link.type || "LINKED",
-        status: status,
-        source: link.source,
-        target: link.target,
-        highlighted: isHighlighted
-      };
-    }).filter(Boolean);
-  }, [data, nodes, highlightedPath]);
+
+        return {
+          id: String(link.rel_id || link.id || `${sourceId}-${targetId}-${index}`),
+          start: new THREE.Vector3(...sourceNode.position),
+          end: new THREE.Vector3(...targetNode.position),
+          label: link.type || "LINKED",
+          source: sourceId,
+          target: targetId,
+          highlighted: isHighlighted,
+        };
+      })
+      .filter(Boolean);
+  }, [data, nodeById, highlightedPath]);
 
   const getColorByType = (type: string, riskScore: number) => {
     if (riskScore > 0.7) return "#ef4444";
-    switch(type?.toUpperCase()) {
-      case "PERSON": return "#3b82f6";
-      case "ORGANIZATION": return "#10b981";
-      case "LOCATION": return "#f59e0b";
-      case "PHONE": return "#8b5cf6";
-      case "ACCOUNT": return "#06b6d4";
-      case "VEHICLE": return "#ec4899";
-      default: return "#94a3b8";
+    switch ((type || "").toUpperCase()) {
+      case "PERSON":
+        return "#3b82f6";
+      case "ORGANIZATION":
+        return "#10b981";
+      case "LOCATION":
+        return "#f59e0b";
+      case "PHONE":
+        return "#8b5cf6";
+      case "ACCOUNT":
+        return "#06b6d4";
+      case "VEHICLE":
+        return "#ec4899";
+      default:
+        return "#94a3b8";
     }
   };
 
   const hasHighlight = highlightedPath.length > 0;
 
+  if (!nodes.length) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-xs font-mono uppercase tracking-widest text-slate-500">
+        No network data
+      </div>
+    );
+  }
+
   return (
-    <Canvas camera={{ position: [0, 0, 48], fov: 60 }}>
-      <ambientLight intensity={0.4} />
-      <pointLight position={[50, 50, 50]} intensity={1.2} />
-      <pointLight position={[-50, -50, -50]} intensity={0.5} />
-      <directionalLight position={[0, 10, 0]} intensity={0.7} />
-      
-      {edges.map((edge: any) => (
-        <NetworkEdge 
-          key={edge.id} 
-          start={edge.start} 
-          end={edge.end} 
-          label={edge.label}
-          status={edge.status}
-          highlighted={edge.highlighted}
-          dimmed={hasHighlight && !edge.highlighted}
-        />
-      ))}
-      
-      {nodes.map((node: any) => {
-        const isHighlighted = highlightedPath.includes(node.id);
-        const isDimmed = hasHighlight && !isHighlighted;
-        return (
-          <NetworkNode 
-            key={node.id} 
-            position={node.position as [number, number, number]} 
-            name={node.name} 
-            type={node.type}
-            riskScore={node.risk_score || 0.0}
-            color={getColorByType(node.type, node.risk_score || 0.0)} 
-            onClick={() => onNodeClick && onNodeClick(node)}
-            highlighted={isHighlighted}
-            dimmed={isDimmed}
+    <div className="h-full w-full min-h-[280px]">
+      <Canvas camera={{ position: [0, 4, 38], fov: 55 }} gl={{ antialias: true }}>
+        <color attach="background" args={["#05070c"]} />
+        <ambientLight intensity={0.45} />
+        <pointLight position={[40, 40, 40]} intensity={1.1} />
+        <pointLight position={[-40, -20, -40]} intensity={0.45} />
+        <directionalLight position={[0, 12, 8]} intensity={0.65} />
+
+        {edges.map((edge: any) => (
+          <NetworkEdge
+            key={edge.id}
+            start={edge.start}
+            end={edge.end}
+            label={edge.label}
+            highlighted={edge.highlighted}
+            dimmed={hasHighlight && !edge.highlighted}
+            onClick={isEditMode ? () => onEdgeClick?.(edge) : undefined}
           />
-        );
-      })}
-      
-      <OrbitControls makeDefault enableDamping dampingFactor={0.05} maxDistance={120} minDistance={10} />
-    </Canvas>
+        ))}
+
+        {nodes.map((node: any) => {
+          const isHighlighted = highlightedPath.map(String).includes(node.id);
+          return (
+            <NetworkNode
+              key={node.id}
+              id={node.id}
+              position={node.position}
+              name={node.name}
+              type={node.type}
+              riskScore={node.risk_score || 0}
+              color={getColorByType(node.type, node.risk_score || 0)}
+              onClick={() => onNodeClick?.(node)}
+              highlighted={isHighlighted}
+              dimmed={hasHighlight && !isHighlighted}
+              isEditMode={isEditMode}
+              onNodeDragEnd={onNodeDragEnd}
+            />
+          );
+        })}
+
+        <OrbitControls makeDefault enableDamping dampingFactor={0.08} maxDistance={90} minDistance={8} />
+      </Canvas>
+    </div>
   );
 }

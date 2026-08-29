@@ -11,6 +11,10 @@ class Relationship(BaseModel):
     target_entity_id: str
     type: str # CALLED, MET, TRANSFERRED_MONEY, WORKED_FOR
     properties: Dict[str, Any] = {}
+    description: Optional[str] = None
+    source: Optional[str] = None
+    notes: Optional[str] = None
+    confidence: Optional[float] = 1.0
     evidence_ids: list[str] = []
     created_by: str
     created_at: datetime = Field(default_factory=datetime.utcnow)

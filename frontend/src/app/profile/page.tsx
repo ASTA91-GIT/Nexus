@@ -16,12 +16,50 @@ export default function ProfilePage() {
     aiSuggestions: true,
   });
 
+  const [stats, setStats] = useState({
+    cases_created: 0,
+    cases_assigned: 0,
+    evidence_uploaded: 0,
+    reports_generated: 0,
+    ai_queries: 0
+  });
+  const [userProfile, setUserProfile] = useState<any>(null);
+
   const getApiUrl = (path: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
     return `${baseUrl}${path}`;
   };
 
   useEffect(() => {
+    const fetchProfileAndStats = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      
+      try {
+        // Fetch User Profile
+        const meRes = await fetch(getApiUrl("/api/auth/me"), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (meRes.ok) {
+          const userData = await meRes.json();
+          setUserProfile(userData);
+        }
+
+        // Fetch Stats
+        const statsRes = await fetch(getApiUrl("/api/stats/"), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setStats(statsData);
+        }
+      } catch (err) {
+        console.error("Failed to fetch profile and stats", err);
+      }
+    };
+
+    fetchProfileAndStats();
+
     // Fetch Audit logs for Activity Tab
     const fetchLogs = async () => {
       const token = localStorage.getItem("token");
@@ -61,17 +99,19 @@ export default function ProfilePage() {
         </div>
         <div className="px-8 pb-8 flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-12 relative z-10">
           <div className="w-24 h-24 rounded-2xl bg-[var(--surface-primary)] p-1.5 shadow-xl">
-            <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--primary-accent)] to-purple-600 flex items-center justify-center text-white font-black text-3xl">
-              AD
+            <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--primary-accent)] to-purple-600 flex items-center justify-center text-white font-black text-3xl uppercase">
+              {userProfile?.email ? userProfile.email.substring(0, 2) : "AD"}
             </div>
           </div>
           <div className="flex-1 space-y-1">
-            <h1 className="text-3xl font-black text-[var(--text-primary)]">Admin Investigator</h1>
-            <p className="text-sm text-[var(--text-secondary)] font-medium">admin@nexus-intel.local</p>
+            <h1 className="text-3xl font-black text-[var(--text-primary)] capitalize">
+              {userProfile?.role === "ADMIN" ? "Admin Investigator" : "Investigator"}
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)] font-medium">{userProfile?.email || "admin@nexus-intel.local"}</p>
             <div className="flex gap-4 mt-2 text-[11px] font-mono font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
-              <span>Role: Global Admin</span>
+              <span>Role: {userProfile?.role || "Global Admin"}</span>
               <span>Status: <span className="text-[var(--success)]">Active</span></span>
-              <span>Last Login: Just now</span>
+              <span>Joined: {userProfile?.created_at ? new Date(userProfile.created_at).toLocaleDateString() : "Just now"}</span>
             </div>
           </div>
           <div className="flex gap-3">
@@ -105,23 +145,23 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm">
               <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Cases Created</span>
-              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">14</p>
+              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.cases_created}</p>
             </div>
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm">
               <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Cases Assigned</span>
-              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">22</p>
+              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.cases_assigned}</p>
             </div>
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm">
               <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Evidence Uploaded</span>
-              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">186</p>
+              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.evidence_uploaded}</p>
             </div>
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm">
               <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Reports Generated</span>
-              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">42</p>
+              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.reports_generated}</p>
             </div>
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm col-span-1 sm:col-span-2">
               <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">AI Investigation Queries</span>
-              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">891</p>
+              <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.ai_queries}</p>
             </div>
           </div>
         )}

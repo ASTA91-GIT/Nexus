@@ -29,6 +29,7 @@ export default function EvidencePage() {
 
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
+  const [isStructured, setIsStructured] = useState<boolean>(true);
 
   const getApiUrl = (path: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
@@ -91,6 +92,7 @@ export default function EvidencePage() {
         setColumns(data.columns);
         setPreviewRows(data.preview);
         setRawData(data.raw_data);
+        setIsStructured(data.is_structured ?? true);
         
         // Auto initialize default mappings if found in columns
         const newMappings: Record<string, string> = {};
@@ -155,6 +157,40 @@ export default function EvidencePage() {
     }
   };
 
+  const handleUnstructuredImport = async () => {
+    if (!activeCaseId || !selectedFile) return;
+    setImporting(true);
+    setMessage(null);
+
+    const token = localStorage.getItem("token");
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("case_id", activeCaseId);
+
+    try {
+      const res = await fetch(getApiUrl("/api/ingestion/upload"), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setImportResult(result);
+        setStep(3);
+        fetchEvidence();
+      } else {
+        const err = await res.json();
+        setMessage({ text: err.detail || "Upload failed.", isError: true });
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage({ text: "Network connection error executing upload.", isError: true });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleResetWizard = () => {
     setSelectedFile(null);
     setColumns([]);
@@ -181,7 +217,7 @@ export default function EvidencePage() {
         <div className="xl:col-span-1 flex flex-col gap-6">
           <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-2xl">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
-              <span>⚡</span> Data Ingestion Wizard
+              <i className="fa-solid fa-bolt text-yellow-500"></i> Data Ingestion Wizard
             </h2>
             
             {message && (
@@ -221,7 +257,7 @@ export default function EvidencePage() {
                               : "bg-zinc-950 border-white/5 text-zinc-400 hover:text-white"
                           }`}
                         >
-                          👥 Entity Directory
+                          <i className="fa-solid fa-users"></i> Entity Directory
                         </button>
                         <button
                           type="button"
@@ -232,16 +268,16 @@ export default function EvidencePage() {
                               : "bg-zinc-950 border-white/5 text-zinc-400 hover:text-white"
                           }`}
                         >
-                          🔗 Relationship Links
+                          <i className="fa-solid fa-link"></i> Relationship Links
                         </button>
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Forensic File (CSV or JSON)</label>
+                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Forensic File (CSV, JSON, PDF, TXT)</label>
                       <input 
                         type="file" 
-                        accept=".csv,.json"
+                        accept=".csv,.json,.pdf,.txt"
                         onChange={handleFileChange}
                         className="w-full text-zinc-400 text-xs bg-zinc-950/60 p-3 rounded-xl border border-white/10 file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-blue-600/15 file:text-blue-400 cursor-pointer"
                         required
@@ -266,106 +302,129 @@ export default function EvidencePage() {
                       <p className="text-zinc-500">Total Rows Detected: <span className="text-zinc-300 font-mono font-semibold">{rawData.length}</span></p>
                     </div>
 
-                    {/* Mapping Selectors */}
-                    <div className="space-y-3">
-                      <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Map Columns to Schema</h3>
-                      
-                      {importType === "ENTITIES" ? (
-                        <>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Entity Name column (Required)</label>
-                            <select
-                              value={mappings.name}
-                              onChange={(e) => setMappings({ ...mappings, name: e.target.value })}
-                              className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                              required
-                            >
-                              <option value="">-- Select Column --</option>
-                              {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Classification/Type column (Optional)</label>
-                            <select
-                              value={mappings.type}
-                              onChange={(e) => setMappings({ ...mappings, type: e.target.value })}
-                              className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                            >
-                              <option value="">-- Default (PERSON) --</option>
-                              {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                            </select>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Source Entity (From) (Required)</label>
-                            <select
-                              value={mappings.source}
-                              onChange={(e) => setMappings({ ...mappings, source: e.target.value })}
-                              className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                              required
-                            >
-                              <option value="">-- Select Column --</option>
-                              {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Target Entity (To) (Required)</label>
-                            <select
-                              value={mappings.target}
-                              onChange={(e) => setMappings({ ...mappings, target: e.target.value })}
-                              className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                              required
-                            >
-                              <option value="">-- Select Column --</option>
-                              {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Relationship Type (Optional)</label>
-                            <select
-                              value={mappings.type}
-                              onChange={(e) => setMappings({ ...mappings, type: e.target.value })}
-                              className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                            >
-                              <option value="">-- Default (CONNECTED_TO) --</option>
-                              {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                            </select>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    {/* Mapping Selectors (Only for structured data) */}
+                    {isStructured ? (
+                      <div className="space-y-3">
+                        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Map Columns to Schema</h3>
+                        
+                        {importType === "ENTITIES" ? (
+                          <>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Entity Name column (Required)</label>
+                              <select
+                                value={mappings.name}
+                                onChange={(e) => setMappings({ ...mappings, name: e.target.value })}
+                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
+                                required
+                              >
+                                <option value="">-- Select Column --</option>
+                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
+                              </select>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Classification/Type column (Optional)</label>
+                              <select
+                                value={mappings.type}
+                                onChange={(e) => setMappings({ ...mappings, type: e.target.value })}
+                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
+                              >
+                                <option value="">-- Default (PERSON) --</option>
+                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
+                              </select>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Source Entity (From) (Required)</label>
+                              <select
+                                value={mappings.source}
+                                onChange={(e) => setMappings({ ...mappings, source: e.target.value })}
+                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
+                                required
+                              >
+                                <option value="">-- Select Column --</option>
+                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
+                              </select>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Target Entity (To) (Required)</label>
+                              <select
+                                value={mappings.target}
+                                onChange={(e) => setMappings({ ...mappings, target: e.target.value })}
+                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
+                                required
+                              >
+                                <option value="">-- Select Column --</option>
+                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
+                              </select>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Relationship Type (Optional)</label>
+                              <select
+                                value={mappings.type}
+                                onChange={(e) => setMappings({ ...mappings, type: e.target.value })}
+                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
+                              >
+                                <option value="">-- Default (CONNECTED_TO) --</option>
+                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
+                              </select>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider"><i className="fa-solid fa-file-lines mr-1"></i> Document Extraction Ready</h3>
+                        <p className="text-xs text-zinc-400">This document will be analyzed, its text extracted, and stored for AI Retrieval Augmented Generation (RAG).</p>
+                      </div>
+                    )}
 
-                    {/* Preview Table */}
+                    {/* Preview Table / Text */}
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Sample Preview (First 3 Rows)</label>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Sample Preview</label>
                       <div className="overflow-x-auto border border-white/5 rounded-xl bg-zinc-950/40 text-[10px]">
-                        <table className="w-full text-left text-zinc-400">
-                          <thead>
-                            <tr className="border-b border-white/5 bg-zinc-900/40 font-mono text-[9px]">
-                              {columns.slice(0, 3).map((col) => <th key={col} className="p-2">{col}</th>)}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/5 font-mono">
-                            {previewRows.slice(0, 3).map((row, idx) => (
-                              <tr key={idx}>
-                                {columns.slice(0, 3).map((col) => <td key={col} className="p-2 truncate max-w-[100px]">{String(row[col])}</td>)}
+                        {isStructured ? (
+                          <table className="w-full text-left text-zinc-400">
+                            <thead>
+                              <tr className="border-b border-white/5 bg-zinc-900/40 font-mono text-[9px]">
+                                {columns.slice(0, 3).map((col) => <th key={col} className="p-2">{col}</th>)}
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-white/5 font-mono">
+                              {previewRows.slice(0, 3).map((row, idx) => (
+                                <tr key={idx}>
+                                  {columns.slice(0, 3).map((col) => <td key={col} className="p-2 truncate max-w-[100px]">{String(row[col])}</td>)}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <div className="p-4 whitespace-pre-wrap text-zinc-400 font-mono leading-relaxed h-32 overflow-y-auto">
+                            {previewRows[0]?.text || "No text extracted..."}
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     <div className="flex gap-3">
-                      <button
-                        onClick={handleExecuteImport}
-                        disabled={importing || (importType === "ENTITIES" ? !mappings.name : (!mappings.source || !mappings.target))}
-                        className="flex-1 p-3 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
-                      >
-                        {importing ? "Importing Records..." : "Execute Import"}
-                      </button>
+                      {isStructured ? (
+                        <button
+                          onClick={handleExecuteImport}
+                          disabled={importing || (importType === "ENTITIES" ? !mappings.name : (!mappings.source || !mappings.target))}
+                          className="flex-1 p-3 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
+                        >
+                          {importing ? "Importing Records..." : "Execute Import"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleUnstructuredImport}
+                          disabled={importing}
+                          className="flex-1 p-3 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
+                        >
+                          {importing ? "Processing Document..." : "Ingest Document for AI"}
+                        </button>
+                      )}
                       <button
                         onClick={handleResetWizard}
                         className="px-4 py-3 bg-zinc-900 hover:bg-zinc-800 border border-white/10 rounded-xl font-bold text-xs text-zinc-400"
@@ -379,7 +438,7 @@ export default function EvidencePage() {
                 {/* STEP 3: Complete Success Status */}
                 {step === 3 && (
                   <div className="text-center py-6 space-y-4">
-                    <span className="text-4xl">✅</span>
+                    <i className="fa-solid fa-circle-check text-4xl text-green-500"></i>
                     <h3 className="text-base font-extrabold text-white">Import Complete!</h3>
                     <p className="text-xs text-zinc-500 leading-relaxed px-4">
                       {importResult?.message || "Data processed successfully."}
@@ -405,7 +464,7 @@ export default function EvidencePage() {
         <div className="xl:col-span-2 flex flex-col gap-6">
           <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-2xl">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
-              <span>📋</span> Case Evidence Registry
+              <i className="fa-solid fa-clipboard-list text-blue-500"></i> Case Evidence Registry
             </h2>
 
             {!activeCaseId ? (

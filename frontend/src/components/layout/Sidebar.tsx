@@ -8,48 +8,49 @@ const navGroups = [
   {
     title: "Command",
     items: [
-      { name: "Command Center", path: "/dashboard", icon: "📊" },
-      { name: "Investigate", path: "/investigate", icon: "🔍" },
+      { name: "Command Center", path: "/dashboard", icon: <i className="fa-solid fa-gauge-high"></i> },
+      { name: "Investigate", path: "/investigate", icon: <i className="fa-solid fa-magnifying-glass"></i> },
     ]
   },
   {
     title: "Case Intelligence",
     items: [
-      { name: "Cases", path: "/cases", icon: "📁" },
-      { name: "Entities", path: "/entities", icon: "👥" },
-      { name: "Global Link Map", path: "/global-network", icon: "🌌" },
-      { name: "Evidence Explorer", path: "/evidence", icon: "📥" },
-      { name: "Timeline", path: "/timeline", icon: "⏳" },
-      { name: "Geographic Intel", path: "/locations", icon: "📍" },
+      { name: "Cases", path: "/cases", icon: <i className="fa-solid fa-folder-open"></i> },
+      { name: "Entities", path: "/entities", icon: <i className="fa-solid fa-users"></i> },
+      { name: "3D Link Map", path: "/network", icon: <i className="fa-solid fa-diagram-project"></i> },
+      { name: "Global Link Map", path: "/global-network", icon: <i className="fa-solid fa-globe"></i> },
+      { name: "Evidence Explorer", path: "/evidence", icon: <i className="fa-solid fa-file-shield"></i> },
+      { name: "Timeline", path: "/timeline", icon: <i className="fa-solid fa-timeline"></i> },
+      { name: "Geographic Intel", path: "/locations", icon: <i className="fa-solid fa-location-dot"></i> },
     ]
   },
   {
     title: "Analysis",
     items: [
-      { name: "Analytics", path: "/analytics", icon: "📈" },
-      { name: "Risk Analysis", path: "/risk", icon: "⚠️" },
-      { name: "Anomalies", path: "/anomalies", icon: "⚡" },
-      { name: "Alert Center", path: "/alerts", icon: "🚨" },
+      { name: "Analytics", path: "/analytics", icon: <i className="fa-solid fa-chart-line"></i> },
+      { name: "Risk Analysis", path: "/risk", icon: <i className="fa-solid fa-triangle-exclamation"></i> },
+      { name: "Anomalies", path: "/anomalies", icon: <i className="fa-solid fa-bolt"></i> },
+      { name: "Alert Center", path: "/alerts", icon: <i className="fa-solid fa-bell"></i> },
     ]
   },
   {
     title: "AI",
     items: [
-      { name: "NEXUS AI", path: "/ai-investigator", icon: "🤖" },
-      { name: "AI History", path: "/ai-history", icon: "🕰️" },
+      { name: "NEXUS AI", path: "/ai-investigator", icon: <i className="fa-solid fa-robot"></i> },
+      { name: "AI History", path: "/ai-history", icon: <i className="fa-solid fa-clock-rotate-left"></i> },
     ]
   },
   {
     title: "Output",
     items: [
-      { name: "Reports", path: "/reports", icon: "📄" },
+      { name: "Reports", path: "/reports", icon: <i className="fa-solid fa-file-invoice"></i> },
     ]
   },
   {
     title: "System",
     items: [
-      { name: "Admin Portal", path: "/admin", icon: "🛡️" },
-      { name: "Settings", path: "/settings", icon: "⚙️" },
+      { name: "Admin Portal", path: "/admin", icon: <i className="fa-solid fa-user-shield"></i> },
+      { name: "Settings", path: "/settings", icon: <i className="fa-solid fa-gear"></i> },
     ]
   }
 ];
@@ -58,7 +59,8 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const { cases, activeCaseId, setActiveCaseId, logout } = useCase();
-  const [userEmail, setUserEmail] = useState("investigator@nexus.gov");
+  const [userEmail, setUserEmail] = useState("investigator@nexus-intel.gov");
+  const [userRole, setUserRole] = useState("USER");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -67,6 +69,7 @@ export default function Sidebar() {
         const payload = JSON.parse(atob(token.split(".")[1]));
         if (payload && payload.sub) {
           setUserEmail(payload.sub);
+          setUserRole(payload.role || "USER");
         }
       } catch (e) {
         console.error("Failed to decode token", e);
@@ -124,7 +127,9 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin">
-        {navGroups.map((group, idx) => (
+        {navGroups.map((group, idx) => {
+          if (group.title === "System" && userRole !== "ADMIN") return null;
+          return (
           <div key={idx} className="space-y-1">
             {!collapsed && (
               <h3 className="px-3.5 mb-2 text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
@@ -155,7 +160,8 @@ export default function Sidebar() {
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Remove User Profile Footer since we moved it to TopBar */}

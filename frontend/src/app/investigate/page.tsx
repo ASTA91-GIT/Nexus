@@ -3,6 +3,9 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useCase } from "@/context/CaseContext";
 
+import GraphEditorControls from "@/components/GraphEditorControls";
+import { EntityModal, RelationshipModal, ConfirmDeleteModal } from "@/components/GraphModals";
+
 const NetworkScene = dynamic(() => import("../../three/NetworkScene"), { ssr: false });
 
 export default function InvestigatePage() {
@@ -11,6 +14,22 @@ export default function InvestigatePage() {
   const [relationships, setRelationships] = useState<any[]>([]);
   const [graphData, setGraphData] = useState<any>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
+
+  // Graph Editor State
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [draggedPositions, setDraggedPositions] = useState<Record<string, { x: number, y: number, z: number }>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Undo / Redo
+  const [undoStack, setUndoStack] = useState<Record<string, any>[]>([]);
+  const [redoStack, setRedoStack] = useState<Record<string, any>[]>([]);
+
+  // Modals
+  const [isEntityModalOpen, setIsEntityModalOpen] = useState(false);
+  const [isRelModalOpen, setIsRelModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSavingModal, setIsSavingModal] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -25,6 +44,7 @@ export default function InvestigatePage() {
 
   // Selection
   const [selectedEntity, setSelectedEntity] = useState<any | null>(null);
+  const [selectedRelationship, setSelectedRelationship] = useState<any | null>(null);
   const [selectedEntityRels, setSelectedEntityRels] = useState<any[]>([]);
 
   // Bottom Tabs
@@ -105,6 +125,175 @@ export default function InvestigatePage() {
     });
     setSelectedEntityRels(filtered);
   }, [selectedEntity, relationships, entities]);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement as HTMLElement;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.tagName === "SELECT")) {
+        return; // do not interfere with typing
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undoStack, redoStack, draggedPositions]);
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) return;
+    const previousState = undoStack[undoStack.length - 1];
+    setRedoStack(prev => [...prev, draggedPositions]);
+    setDraggedPositions(previousState);
+    setUndoStack(prev => prev.slice(0, -1));
+    setUnsavedChanges(true);
+  }, [undoStack, draggedPositions]);
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.length === 0) return;
+    const nextState = redoStack[redoStack.length - 1];
+    setUndoStack(prev => [...prev, draggedPositions]);
+    setDraggedPositions(nextState);
+    setRedoStack(prev => prev.slice(0, -1));
+    setUnsavedChanges(true);
+  }, [redoStack, draggedPositions]);
+
+  const handleNodeDragEnd = useCallback((id: string, x: number, y: number, z: number) => {
+    setUndoStack(prev => [...prev, draggedPositions]);
+    setRedoStack([]);
+    setDraggedPositions(prev => ({ ...prev, [id]: { x, y, z } }));
+    setUnsavedChanges(true);
+  }, [draggedPositions]);
+
+  const handleSaveEntity = async (data: any) => {
+    setIsSavingModal(true);
+    const token = localStorage.getItem("token");
+    try {
+      const isEdit = isEntityModalOpen && selectedEntity;
+      const url = getApiUrl(isEdit ? `/api/entities/${selectedEntity._id}?case_id=${activeCaseId}` : "/api/entities/");
+      const method = isEdit ? "PUT" : "POST";
+      const payload = { ...data, case_id: activeCaseId };
+      
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setIsEntityModalOpen(false);
+        fetchWorkspaceData();
+      } else {
+        alert("Failed to save entity.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error saving entity.");
+    } finally {
+      setIsSavingModal(false);
+    }
+  };
+
+  const handleSaveRelationship = async (data: any) => {
+    setIsSavingModal(true);
+    const token = localStorage.getItem("token");
+    try {
+      const url = getApiUrl(selectedRelationship ? `/api/relationships/${selectedRelationship._id}` : "/api/relationships/");
+      const method = selectedRelationship ? "PUT" : "POST";
+      const payload = { ...data, case_id: activeCaseId };
+      
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setIsRelModalOpen(false);
+        fetchWorkspaceData();
+      } else {
+        alert("Failed to save relationship.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error saving relationship.");
+    } finally {
+      setIsSavingModal(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedEntity && !selectedRelationship) return;
+    setIsSavingModal(true);
+    const token = localStorage.getItem("token");
+    try {
+      if (selectedEntity) {
+        const res = await fetch(getApiUrl(`/api/entities/${selectedEntity._id}?case_id=${activeCaseId}`), {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setIsDeleteModalOpen(false);
+          setSelectedEntity(null);
+          fetchWorkspaceData();
+        } else {
+          alert("Failed to delete entity.");
+        }
+      } else if (selectedRelationship) {
+        const res = await fetch(getApiUrl(`/api/relationships/${selectedRelationship._id}?case_id=${activeCaseId}`), {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setIsDeleteModalOpen(false);
+          setSelectedRelationship(null);
+          fetchWorkspaceData();
+        } else {
+          alert("Failed to delete relationship.");
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error deleting.");
+    } finally {
+      setIsSavingModal(false);
+    }
+  };
+
+  const handleSaveLayout = async () => {
+    if (!activeCaseId) return;
+    setIsSaving(true);
+    const token = localStorage.getItem("token");
+    
+    const positions = Object.entries(draggedPositions).map(([entity_id, pos]) => ({
+      entity_id,
+      position: pos
+    }));
+
+    try {
+      const res = await fetch(getApiUrl(`/api/entities/bulk/positions`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ case_id: activeCaseId, positions })
+      });
+      if (res.ok) {
+        setUnsavedChanges(false);
+        setDraggedPositions({});
+        fetchWorkspaceData();
+      } else {
+        alert("Failed to save layout.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving layout.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleTracePath = async () => {
     if (!activeCaseId || !sourceId || !targetId) return;
@@ -231,19 +420,19 @@ export default function InvestigatePage() {
             <div className="space-y-2 bg-[var(--surface-secondary)]/50 p-3 border border-[var(--border-primary)] rounded-xl text-xs text-[var(--text-secondary)]">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={filters.person} onChange={() => setFilters({ ...filters, person: !filters.person })} className="rounded bg-[var(--surface-primary)] border-[var(--border-primary)] text-[var(--primary-accent)] focus:ring-0" />
-                <span>👤 Persons</span>
+                <span><i className="fa-solid fa-user"></i> Persons</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={filters.organization} onChange={() => setFilters({ ...filters, organization: !filters.organization })} className="rounded bg-[var(--surface-primary)] border-[var(--border-primary)] text-[var(--success)] focus:ring-0" />
-                <span>🏢 Organizations</span>
+                <span><i className="fa-solid fa-building"></i> Organizations</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={filters.location} onChange={() => setFilters({ ...filters, location: !filters.location })} className="rounded bg-[var(--surface-primary)] border-[var(--border-primary)] text-[var(--warning)] focus:ring-0" />
-                <span>📍 Locations</span>
+                <span><i className="fa-solid fa-location-dot"></i> Locations</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={filters.phone} onChange={() => setFilters({ ...filters, phone: !filters.phone })} className="rounded bg-[var(--surface-primary)] border-[var(--border-primary)] text-[var(--info)] focus:ring-0" />
-                <span>📞 Communications</span>
+                <span><i className="fa-solid fa-phone"></i> Communications</span>
               </label>
             </div>
           </div>
@@ -259,7 +448,7 @@ export default function InvestigatePage() {
             />
             <label className="flex items-center gap-2 cursor-pointer text-xs mt-2">
               <input type="checkbox" checked={filters.highRisk} onChange={() => setFilters({ ...filters, highRisk: !filters.highRisk })} className="rounded bg-[var(--surface-primary)] border-[var(--border-primary)] text-[var(--danger)] focus:ring-0" />
-              <span className="text-[var(--danger)] font-semibold">🚨 Threat-Flagged Only</span>
+              <span className="text-[var(--danger)] font-semibold"><i className="fa-solid fa-triangle-exclamation"></i> Threat-Flagged Only</span>
             </label>
           </div>
 
@@ -285,6 +474,53 @@ export default function InvestigatePage() {
 
         {/* CENTER AREA */}
         <main className="flex-1 bg-black/60 border border-[var(--border-primary)] rounded-2xl relative overflow-hidden flex flex-col shadow-2xl">
+          {activeCaseId && !loading && (
+            <>
+             <GraphEditorControls 
+                isEditMode={isEditMode}
+                setIsEditMode={setIsEditMode}
+                unsavedChanges={unsavedChanges}
+                onSaveLayout={handleSaveLayout}
+                onAddEntity={() => { setSelectedEntity(null); setIsEntityModalOpen(true); }}
+                onAddRelationship={() => { setSelectedRelationship(null); setIsRelModalOpen(true); }}
+                onEditSelected={() => setIsEntityModalOpen(true)}
+                onDeleteSelected={() => setIsDeleteModalOpen(true)}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                canUndo={undoStack.length > 0}
+                canRedo={redoStack.length > 0}
+                selectedEntity={selectedEntity}
+                selectedRelationship={selectedRelationship}
+                isSaving={isSaving}
+             />
+             
+             <EntityModal 
+                isOpen={isEntityModalOpen} 
+                onClose={() => setIsEntityModalOpen(false)} 
+                onSave={handleSaveEntity} 
+                entity={selectedEntity} 
+                isLoading={isSavingModal} 
+             />
+             
+             <RelationshipModal 
+                isOpen={isRelModalOpen} 
+                onClose={() => setIsRelModalOpen(false)} 
+                onSave={handleSaveRelationship} 
+                entities={entities}
+                relationship={selectedRelationship}
+                isLoading={isSavingModal} 
+             />
+             
+             <ConfirmDeleteModal 
+                isOpen={isDeleteModalOpen} 
+                onClose={() => setIsDeleteModalOpen(false)} 
+                onConfirm={confirmDelete} 
+                title={selectedEntity ? "Delete Entity" : "Delete Relationship"} 
+                message={selectedEntity ? `Deleting "${selectedEntity?.name}" will also remove ${selectedEntityRels.length} directly connected relationships.` : `Deleting relationship type "${selectedRelationship?.type}"?`} 
+                isLoading={isSavingModal} 
+             />
+            </>
+          )}
           {!activeCaseId ? (
             <div className="absolute inset-0 flex items-center justify-center text-[var(--text-secondary)] text-sm font-bold uppercase tracking-widest">
               Please select a case
@@ -299,8 +535,17 @@ export default function InvestigatePage() {
               onNodeClick={(n: any) => {
                 const ent = entities.find(e => e._id === n.id);
                 if (ent) setSelectedEntity(ent);
+                setSelectedRelationship(null);
+              }}
+              onEdgeClick={(edge: any) => {
+                const rel = relationships.find(r => String(r._id) === edge.id || String(r.id) === edge.id || String(r.rel_id) === edge.id);
+                if (rel) setSelectedRelationship(rel);
+                setSelectedEntity(null);
               }}
               highlightedPath={pathResult ? pathResult.path : []} 
+              isEditMode={isEditMode}
+              onNodeDragEnd={handleNodeDragEnd}
+              draggedPositions={draggedPositions}
             />
           )}
 
@@ -373,13 +618,13 @@ export default function InvestigatePage() {
         {/* TABS HEADER */}
         <div className="flex gap-4 border-b border-[var(--border-primary)] mb-4">
           <button onClick={() => setActiveTab("EXPLORER")} className={`pb-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === "EXPLORER" ? "border-[var(--primary-accent)] text-[var(--primary-accent)]" : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"}`}>
-            🔗 Connection Explorer
+            <i className="fa-solid fa-link"></i> Connection Explorer
           </button>
           <button onClick={() => setActiveTab("WKW")} className={`pb-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === "WKW" ? "border-[var(--danger)] text-[var(--danger)]" : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"}`}>
-            🔪 Who Killed Who
+            <i className="fa-solid fa-skull"></i> Who Killed Who
           </button>
           <button onClick={() => setActiveTab("STORY")} className={`pb-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === "STORY" ? "border-[var(--info)] text-[var(--info)]" : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"}`}>
-            📖 Case Story
+            <i className="fa-solid fa-book-open"></i> Case Story
           </button>
         </div>
 

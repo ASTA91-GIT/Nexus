@@ -24,3 +24,23 @@ async def parse_pdf(file_bytes: bytes) -> str:
     except Exception as e:
         print(f"Failed to parse PDF: {e}")
         return "Failed to parse PDF content."
+
+async def parse_docx(file_bytes: bytes) -> str:
+    try:
+        import docx
+        doc = docx.Document(BytesIO(file_bytes))
+        return "\n".join([para.text for para in doc.paragraphs])
+    except Exception as e:
+        print(f"Failed to parse DOCX: {e}")
+        return "Failed to parse DOCX content."
+
+async def parse_image(file_bytes: bytes) -> str:
+    try:
+        from PIL import Image
+        import pytesseract
+        image = Image.open(BytesIO(file_bytes))
+        text = pytesseract.image_to_string(image)
+        return text
+    except Exception as e:
+        print(f"Failed to parse Image: {e}")
+        return "Failed to parse Image content. (OCR requires tesseract)"

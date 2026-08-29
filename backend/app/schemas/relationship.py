@@ -9,10 +9,21 @@ class RelationshipBase(BaseModel):
     target_entity_id: str
     type: str
     properties: Optional[Dict[str, Any]] = {}
+    description: Optional[str] = ""
+    source: Optional[str] = "UNKNOWN"
+    notes: Optional[str] = ""
+    confidence: Optional[float] = 1.0
     evidence_ids: Optional[List[str]] = []
 
 class RelationshipCreate(RelationshipBase):
     pass
+
+class RelationshipUpdate(BaseModel):
+    type: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = None
+    description: Optional[str] = None
+    notes: Optional[str] = None
+    confidence: Optional[float] = None
 
 class RelationshipOut(RelationshipBase):
     id: PyObjectId = Field(alias="_id")

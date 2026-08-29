@@ -72,7 +72,7 @@ export default function Dashboard() {
       
       {/* BACKGROUND 3D GRAPH (CENTERPIECE) */}
       <div className="absolute inset-0 z-0">
-        {!loading && graphData.nodes.length > 0 ? (
+        {!loading && (graphData.nodes?.length || 0) > 0 ? (
           <NetworkScene data={graphData} onNodeClick={() => {}} />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-black/10">
@@ -162,11 +162,11 @@ export default function Dashboard() {
               <h3 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-4">Network Topology</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-[var(--surface-secondary)]/50 p-2.5 rounded-lg border border-[var(--border-primary)] text-center">
-                  <p className="text-xl font-black text-[var(--text-primary)]">{graphData.nodes.length}</p>
+                  <p className="text-xl font-black text-[var(--text-primary)]">{graphData.nodes?.length || 0}</p>
                   <p className="text-[9px] text-[var(--text-secondary)] uppercase font-bold mt-1">Nodes</p>
                 </div>
                 <div className="bg-[var(--surface-secondary)]/50 p-2.5 rounded-lg border border-[var(--border-primary)] text-center">
-                  <p className="text-xl font-black text-[var(--text-primary)]">{graphData.links.length}</p>
+                  <p className="text-xl font-black text-[var(--text-primary)]">{graphData.links?.length || graphData.edges?.length || 0}</p>
                   <p className="text-[9px] text-[var(--text-secondary)] uppercase font-bold mt-1">Edges</p>
                 </div>
               </div>
@@ -203,17 +203,17 @@ export default function Dashboard() {
         <div className="flex justify-center pointer-events-auto">
           <div className="bg-[var(--surface-primary)]/90 backdrop-blur-md border border-[var(--border-primary)] rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-6">
             <Link href="/investigate" className="flex flex-col items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--primary-accent)] transition-colors">
-              <span className="text-xl">🔍</span>
+              <i className="fa-solid fa-magnifying-glass text-xl"></i>
               <span className="text-[10px] font-bold uppercase tracking-wider">Investigate</span>
             </Link>
             <div className="w-px h-8 bg-[var(--border-primary)]"></div>
             <Link href="/reports" className="flex flex-col items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-              <span className="text-xl">📊</span>
+              <i className="fa-solid fa-chart-column text-xl"></i>
               <span className="text-[10px] font-bold uppercase tracking-wider">Reports</span>
             </Link>
             <div className="w-px h-8 bg-[var(--border-primary)]"></div>
             <Link href="/risk" className="flex flex-col items-center gap-1.5 text-[var(--text-secondary)] hover:text-[var(--danger)] transition-colors">
-              <span className="text-xl">⚠️</span>
+              <i className="fa-solid fa-triangle-exclamation text-xl"></i>
               <span className="text-[10px] font-bold uppercase tracking-wider">Risk Dash</span>
             </Link>
             <div className="w-px h-8 bg-[var(--border-primary)]"></div>

@@ -172,7 +172,7 @@ export default function CasesPage() {
         {/* Left Side: Create Case Form */}
         <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-2xl h-fit">
           <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
-            <span>📁</span> Open New Case File
+            <i className="fa-solid fa-folder-open text-blue-500"></i> Open New Case File
           </h2>
           <form onSubmit={handleCreateCase} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
@@ -380,15 +380,17 @@ export default function CasesPage() {
                             )}
                             <button 
                               onClick={() => handleEditStart(c)}
-                              className="p-1.5 rounded-lg border border-white/5 hover:border-white/10 hover:bg-white/5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer text-xs"
+                              className="p-1.5 rounded-lg border border-white/5 hover:border-white/10 hover:bg-white/5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer text-xs flex items-center justify-center w-8 h-8"
+                              title="Edit Case"
                             >
-                              ✏️
+                              <i className="fa-solid fa-pen"></i>
                             </button>
                             <button 
                               onClick={() => handleDeleteCase(c._id)}
-                              className="p-1.5 rounded-lg border border-white/5 hover:border-red-500/20 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors cursor-pointer text-xs"
+                              className="p-1.5 rounded-lg border border-white/5 hover:border-red-500/20 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-colors cursor-pointer text-xs flex items-center justify-center w-8 h-8"
+                              title="Delete Case"
                             >
-                              🗑️
+                              <i className="fa-solid fa-trash"></i>
                             </button>
                           </div>
                         </div>

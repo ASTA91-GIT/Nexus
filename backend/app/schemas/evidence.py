@@ -9,6 +9,9 @@ class EvidenceBase(BaseModel):
     source_type: str
     file_path: Optional[str] = None
     raw_content: Optional[str] = None
+    processing_status: Optional[str] = "PENDING"
+    extraction_status: Optional[str] = "PENDING"
+    file_type: Optional[str] = None
 
 class EvidenceCreate(EvidenceBase):
     pass

@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import List, Any, Optional, Dict
 from app.core.database import get_database
 from app.api.routes.auth import get_current_user
-from app.ingestion.parsers import parse_csv, parse_json, parse_txt, parse_pdf
+from app.ingestion.parsers import parse_csv, parse_json, parse_txt, parse_pdf, parse_docx, parse_image
+from app.services.rag_service import index_document
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -28,6 +29,10 @@ async def upload_file(
             parsed_data = {"text": await parse_txt(contents)}
         elif filename.endswith(".pdf"):
             parsed_data = {"text": await parse_pdf(contents)}
+        elif filename.endswith(".docx") or filename.endswith(".doc"):
+            parsed_data = {"text": await parse_docx(contents)}
+        elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg"):
+            parsed_data = {"text": await parse_image(contents)}
         else:
             raise HTTPException(status_code=400, detail="Unsupported file format")
     except Exception as e:
@@ -132,6 +137,92 @@ async def upload_file(
     }
     result = await db["evidence"].insert_one(ev_dict)
     
+    # Index the document for RAG AI responses
+    try:
+        raw_text = ""
+        if isinstance(parsed_data, dict) and "text" in parsed_data:
+            raw_text = parsed_data["text"]
+        elif isinstance(parsed_data, list):
+            import json
+            raw_text = json.dumps(parsed_data)
+        elif isinstance(parsed_data, str):
+            raw_text = parsed_data
+            
+        if raw_text:
+            index_document(case_id, str(result.inserted_id), raw_text)
+            
+            # --- AI EXTRACTION PIPELINE ---
+            try:
+                from app.ai.entity_extraction import extract_entities_and_relationships
+                ai_results = await extract_entities_and_relationships(raw_text)
+                
+                # 1. Insert/Deduplicate Entities
+                entity_name_to_id = {}
+                for ent in ai_results.get("entities", []):
+                    ent_name = ent.get("name", "").strip()
+                    if not ent_name: continue
+                    
+                    ent_type = str(ent.get("type", "PERSON")).upper()
+                    
+                    # Deduplicate in DB
+                    existing = await db["entities"].find_one({"case_id": case_id, "name": {"$regex": f"^{re.escape(ent_name)}$", "$options": "i"}})
+                    if existing:
+                        entity_name_to_id[ent_name.lower()] = str(existing["_id"])
+                    else:
+                        ent_doc = {
+                            "case_id": case_id,
+                            "type": ent_type,
+                            "name": ent_name,
+                            "properties": {"description": ent.get("description", "")},
+                            "risk_score": float(ent.get("risk_score", 0.0)),
+                            "source": "AI_EXTRACTED",
+                            "created_by": current_user["email"],
+                            "created_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow()
+                        }
+                        res = await db["entities"].insert_one(ent_doc)
+                        entity_name_to_id[ent_name.lower()] = str(res.inserted_id)
+                        entities_created += 1
+                        
+                # 2. Insert/Deduplicate Relationships
+                for rel in ai_results.get("relationships", []):
+                    source_name = rel.get("source", "").strip().lower()
+                    target_name = rel.get("target", "").strip().lower()
+                    
+                    source_id = entity_name_to_id.get(source_name)
+                    target_id = entity_name_to_id.get(target_name)
+                    
+                    if source_id and target_id and source_id != target_id:
+                        rel_type = str(rel.get("type", "ASSOCIATED_WITH")).upper()
+                        
+                        existing_rel = await db["relationships"].find_one({
+                            "case_id": case_id,
+                            "source_entity_id": source_id,
+                            "target_entity_id": target_id,
+                            "type": rel_type
+                        })
+                        
+                        if not existing_rel:
+                            rel_doc = {
+                                "case_id": case_id,
+                                "source_entity_id": source_id,
+                                "target_entity_id": target_id,
+                                "type": rel_type,
+                                "properties": {"description": rel.get("description", "")},
+                                "evidence_ids": [str(result.inserted_id)],
+                                "source": "AI_EXTRACTED",
+                                "created_by": current_user["email"],
+                                "created_at": datetime.utcnow(),
+                                "updated_at": datetime.utcnow()
+                            }
+                            await db["relationships"].insert_one(rel_doc)
+                            relationships_created += 1
+            except Exception as ai_e:
+                print(f"AI Extraction failed (non-fatal): {ai_e}")
+                
+    except Exception as e:
+        print(f"Failed to index document in ChromaDB: {e}")
+    
     return {
         "message": f"File processed successfully. Ingested {entities_created} entities and {relationships_created} relationships.",
         "evidence_id": str(result.inserted_id),
@@ -155,13 +246,26 @@ async def preview_file(
     filename = file.filename.lower()
     
     parsed_data = None
+    is_structured = False
     try:
         if filename.endswith(".csv"):
             parsed_data = await parse_csv(contents)
+            is_structured = True
         elif filename.endswith(".json"):
             parsed_data = await parse_json(contents)
+            is_structured = True
         elif filename.endswith(".txt"):
-            parsed_data = [{"text": line} for line in (await parse_txt(contents)).split("\n") if line.strip()]
+            text = await parse_txt(contents)
+            parsed_data = [{"text": text[:1000] + ("..." if len(text) > 1000 else "")}]
+        elif filename.endswith(".pdf"):
+            text = await parse_pdf(contents)
+            parsed_data = [{"text": text[:1000] + ("..." if len(text) > 1000 else "")}]
+        elif filename.endswith(".docx") or filename.endswith(".doc"):
+            text = await parse_docx(contents)
+            parsed_data = [{"text": text[:1000] + ("..." if len(text) > 1000 else "")}]
+        elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg"):
+            text = await parse_image(contents)
+            parsed_data = [{"text": text[:1000] + ("..." if len(text) > 1000 else "")}]
         else:
             raise HTTPException(status_code=400, detail="Unsupported file format for preview")
     except Exception as e:
@@ -171,15 +275,16 @@ async def preview_file(
         raise HTTPException(status_code=400, detail="No data parsed from file")
         
     columns = []
-    if isinstance(parsed_data, list) and len(parsed_data) > 0:
+    if is_structured and isinstance(parsed_data, list) and len(parsed_data) > 0:
         columns = list(parsed_data[0].keys())
         
     return {
         "filename": file.filename,
         "columns": columns,
-        "preview": parsed_data[:10],  # first 10 rows
+        "preview": parsed_data[:10] if is_structured else parsed_data,
         "total_rows": len(parsed_data) if isinstance(parsed_data, list) else 1,
-        "raw_data": parsed_data
+        "raw_data": parsed_data,
+        "is_structured": is_structured
     }
 
 @router.post("/import-mapped")
