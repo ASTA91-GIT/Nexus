@@ -4,7 +4,13 @@ import json
 import re
 
 EXTRACTION_PROMPT = """
-You are an expert intelligence analyst. Your task is to extract meaningful investigation entities and their relationships from the provided evidence text.
+You are an expert intelligence analyst. Your task is to extract meaningful investigation entities and their relationships from the provided evidence text. 
+
+CRITICAL RULES:
+1. STRICTLY extract ONLY entities that are EXPLICITLY mentioned in the text. Do NOT hallucinate, infer, or guess entities that are not present.
+2. Ensure that the identified text actually represents a specific, named entity (e.g., "John Smith" not "a man", "Apple Inc" not "a company").
+3. Assign each entity to one of the strictly supported types below. If an entity does not fit, do NOT extract it.
+4. Extract relationships ONLY if they are explicitly stated or clearly implied by the text.
 
 Supported Entity Types:
 - PERSON

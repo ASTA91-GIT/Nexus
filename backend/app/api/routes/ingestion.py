@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from typing import List, Any, Optional, Dict
 from app.core.database import get_database
 from app.api.routes.auth import get_current_user
@@ -10,126 +10,7 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
-@router.post("/upload")
-async def upload_file(
-    case_id: str = Form(...),
-    file: UploadFile = File(...),
-    db=Depends(get_database), 
-    current_user=Depends(get_current_user)
-):
-    contents = await file.read()
-    filename = file.filename.lower()
-    
-    parsed_data = None
-    is_supported_format = True
-    try:
-        if filename.endswith(".csv"):
-            parsed_data = await parse_csv(contents)
-        elif filename.endswith(".json"):
-            parsed_data = await parse_json(contents)
-        elif filename.endswith(".txt"):
-            parsed_data = {"text": await parse_txt(contents)}
-        elif filename.endswith(".pdf"):
-            parsed_data = {"text": await parse_pdf(contents)}
-        elif filename.endswith(".docx") or filename.endswith(".doc"):
-            parsed_data = {"text": await parse_docx(contents)}
-        elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg") or filename.endswith(".webp"):
-            parsed_data = {"text": await parse_image(contents)}
-        else:
-            is_supported_format = False
-            parsed_data = {"text": "Binary file or unsupported format. No automated intelligence extraction available."}
-    except Exception as e:
-        is_supported_format = False
-        parsed_data = {"text": f"Failed to parse file: {str(e)}"}
-
-    entities_created = 0
-    relationships_created = 0
-
-    # Auto-extract entities and relationships from CSV/JSON lists of dicts
-    if isinstance(parsed_data, list):
-        for record in parsed_data:
-            # Check for Entity row (has 'name' and 'type')
-            if "name" in record and "type" in record:
-                entity_doc = {
-                    "case_id": case_id,
-                    "type": str(record["type"]).upper(),
-                    "name": str(record["name"]),
-                    "properties": {k: v for k, v in record.items() if k not in ["name", "type", "case_id"]},
-                    "risk_score": float(record.get("risk_score", 0.0)),
-                    "created_by": current_user["email"],
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                }
-                # Check for duplicate
-                existing = await db["entities"].find_one({"case_id": case_id, "name": entity_doc["name"]})
-                if not existing:
-                    await db["entities"].insert_one(entity_doc)
-                    entities_created += 1
-            
-            # Check for Relationship row (has 'source' and 'target' and 'type')
-            elif "source" in record and "target" in record and "type" in record:
-                # Find or create source entity
-                src_name = str(record["source"])
-                src_ent = await db["entities"].find_one({"case_id": case_id, "name": src_name})
-                if not src_ent:
-                    src_res = await db["entities"].insert_one({
-                        "case_id": case_id,
-                        "type": "PERSON",
-                        "name": src_name,
-                        "properties": {},
-                        "risk_score": 0.0,
-                        "created_by": current_user["email"],
-                        "created_at": datetime.utcnow(),
-                        "updated_at": datetime.utcnow()
-                    })
-                    src_ent_id = str(src_res.inserted_id)
-                    entities_created += 1
-                else:
-                    src_ent_id = str(src_ent["_id"])
-                    
-                # Find or create target entity
-                tgt_name = str(record["target"])
-                tgt_ent = await db["entities"].find_one({"case_id": case_id, "name": tgt_name})
-                if not tgt_ent:
-                    tgt_res = await db["entities"].insert_one({
-                        "case_id": case_id,
-                        "type": "PERSON",
-                        "name": tgt_name,
-                        "properties": {},
-                        "risk_score": 0.0,
-                        "created_by": current_user["email"],
-                        "created_at": datetime.utcnow(),
-                        "updated_at": datetime.utcnow()
-                    })
-                    tgt_ent_id = str(tgt_res.inserted_id)
-                    entities_created += 1
-                else:
-                    tgt_ent_id = str(tgt_ent["_id"])
-                
-                # Check for duplicate relationship
-                rel_type = str(record["type"]).upper()
-                existing_rel = await db["relationships"].find_one({
-                    "case_id": case_id,
-                    "source_entity_id": src_ent_id,
-                    "target_entity_id": tgt_ent_id,
-                    "type": rel_type
-                })
-                
-                if not existing_rel:
-                    rel_doc = {
-                        "case_id": case_id,
-                        "source_entity_id": src_ent_id,
-                        "target_entity_id": tgt_ent_id,
-                        "type": rel_type,
-                        "properties": {k: v for k, v in record.items() if k not in ["source", "target", "type", "case_id"]},
-                        "evidence_ids": [],
-                        "created_by": current_user["email"],
-                        "created_at": datetime.utcnow(),
-                        "updated_at": datetime.utcnow()
-                    }
-                    await db["relationships"].insert_one(rel_doc)
-                    relationships_created += 1
-
+async def process_evidence_background(db, case_id: str, parsed_data: Any, is_supported_format: bool, current_user: dict, evidence_id: str):
     # Store evidence file record
     ev_dict = {
         "case_id": case_id,
@@ -141,112 +22,16 @@ async def upload_file(
     }
     result = await db["evidence"].insert_one(ev_dict)
     
-    # Index the document for RAG AI responses
-    try:
-        raw_text = ""
-        if isinstance(parsed_data, dict) and "text" in parsed_data:
-            raw_text = parsed_data["text"]
-        elif isinstance(parsed_data, list):
-            import json
-            raw_text = json.dumps(parsed_data)
-        elif isinstance(parsed_data, str):
-            raw_text = parsed_data
-            
-        if raw_text and is_supported_format:
-            index_document(case_id, str(result.inserted_id), raw_text)
-            
-            # --- AI EXTRACTION PIPELINE ---
-            try:
-                from app.ai.entity_extraction import extract_entities_and_relationships
-                ai_results = await extract_entities_and_relationships(raw_text)
-                
-                if "error" in ai_results:
-                    print(f"CRITICAL: AI Extraction returned an error: {ai_results.get('details', ai_results['error'])}")
-                    # Optionally raise error here, but to allow file upload to succeed while warning user:
-                    raise Exception(f"AI Extraction failed: {ai_results.get('details', ai_results['error'])}")
-                    
-                # 1. Insert/Deduplicate Entities
-                entity_name_to_id = {}
-                for ent in ai_results.get("entities", []):
-                    ent_name = ent.get("name", "").strip()
-                    if not ent_name: continue
-                    
-                    ent_type = str(ent.get("type", "PERSON")).upper()
-                    
-                    # Deduplicate in DB
-                    existing = await db["entities"].find_one({"case_id": case_id, "name": {"$regex": f"^{re.escape(ent_name)}$", "$options": "i"}})
-                    if existing:
-                        entity_name_to_id[ent_name.lower()] = str(existing["_id"])
-                    else:
-                        ent_doc = {
-                            "case_id": case_id,
-                            "type": ent_type,
-                            "name": ent_name,
-                            "properties": {"description": ent.get("description", "")},
-                            "risk_score": float(ent.get("risk_score", 0.0)),
-                            "source": "AI_EXTRACTED",
-                            "created_by": current_user["email"],
-                            "created_at": datetime.utcnow(),
-                            "updated_at": datetime.utcnow()
-                        }
-                        res = await db["entities"].insert_one(ent_doc)
-                        entity_name_to_id[ent_name.lower()] = str(res.inserted_id)
-                        entities_created += 1
-                        
-                # 2. Insert/Deduplicate Relationships
-                for rel in ai_results.get("relationships", []):
-                    source_name = rel.get("source", "").strip().lower()
-                    target_name = rel.get("target", "").strip().lower()
-                    
-                    source_id = entity_name_to_id.get(source_name)
-                    target_id = entity_name_to_id.get(target_name)
-                    
-                    if source_id and target_id and source_id != target_id:
-                        rel_type = str(rel.get("type", "ASSOCIATED_WITH")).upper()
-                        
-                        existing_rel = await db["relationships"].find_one({
-                            "case_id": case_id,
-                            "source_entity_id": source_id,
-                            "target_entity_id": target_id,
-                            "type": rel_type
-                        })
-                        
-                        if not existing_rel:
-                            rel_doc = {
-                                "case_id": case_id,
-                                "source_entity_id": source_id,
-                                "target_entity_id": target_id,
-                                "type": rel_type,
-                                "properties": {"description": rel.get("description", "")},
-                                "evidence_ids": [str(result.inserted_id)],
-                                "source": "AI_EXTRACTED",
-                                "created_by": current_user["email"],
-                                "created_at": datetime.utcnow(),
-                                "updated_at": datetime.utcnow()
-                            }
-                            await db["relationships"].insert_one(rel_doc)
-                            relationships_created += 1
-            except HTTPException:
-                raise
-            except Exception as ai_e:
-                import traceback
-                print(f"AI Extraction pipeline failed: {ai_e}")
-                traceback.print_exc()
-                raise HTTPException(
-                    status_code=500, 
-                    detail=f"AI Extraction failed at pipeline stage: {str(ai_e)}"
-                )
-                
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Failed to index document in ChromaDB: {e}")
+    background_tasks.add_task(
+        process_evidence_background,
+        db, case_id, parsed_data, is_supported_format, current_user, str(result.inserted_id)
+    )
     
     return {
-        "message": f"File processed successfully. Ingested {entities_created} entities and {relationships_created} relationships.",
+        "message": "File processed successfully. Extraction running in background.",
         "evidence_id": str(result.inserted_id),
-        "entities_created": entities_created,
-        "relationships_created": relationships_created
+        "entities_created": 0,
+        "relationships_created": 0
     }
 
 class ImportMappedRequest(BaseModel):
@@ -307,130 +92,8 @@ async def preview_file(
     }
 
 @router.post("/import-mapped")
-async def import_mapped_data(
-    req: ImportMappedRequest,
-    db=Depends(get_database),
-    current_user=Depends(get_current_user)
-):
-    case_id = req.case_id
-    import_type = req.import_type.upper()
-    data = req.data
-    mappings = req.mappings
-    
-    entities_created = 0
-    relationships_created = 0
-    
-    if import_type == "ENTITIES":
-        name_key = mappings.get("name")
-        type_key = mappings.get("type")
-        
-        if not name_key:
-            raise HTTPException(status_code=400, detail="Name mapping field is required for Entity imports")
-            
-        for record in data:
-            val_name = record.get(name_key)
-            if not val_name:
-                continue
-            
-            val_type = record.get(type_key, "PERSON") if type_key else "PERSON"
-            val_type = str(val_type).upper()
-            
-            properties = {k: v for k, v in record.items() if k not in [name_key, type_key]}
-            
-            entity_doc = {
-                "case_id": case_id,
-                "type": val_type,
-                "name": str(val_name),
-                "properties": properties,
-                "risk_score": float(record.get("risk_score", 0.0)),
-                "created_by": current_user["email"],
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
-            }
-            
-            existing = await db["entities"].find_one({"case_id": case_id, "name": entity_doc["name"]})
-            if not existing:
-                await db["entities"].insert_one(entity_doc)
-                entities_created += 1
-                
-    elif import_type == "RELATIONSHIPS":
-        src_key = mappings.get("source")
-        tgt_key = mappings.get("target")
-        type_key = mappings.get("type")
-        
-        if not src_key or not tgt_key:
-            raise HTTPException(status_code=400, detail="Source and Target mapping fields are required for Relationship imports")
-            
-        for record in data:
-            src_name = record.get(src_key)
-            tgt_name = record.get(tgt_key)
-            if not src_name or not tgt_name:
-                continue
-                
-            src_name = str(src_name)
-            tgt_name = str(tgt_name)
-            
-            src_ent = await db["entities"].find_one({"case_id": case_id, "name": src_name})
-            if not src_ent:
-                src_res = await db["entities"].insert_one({
-                    "case_id": case_id,
-                    "type": "PERSON",
-                    "name": src_name,
-                    "properties": {},
-                    "risk_score": 0.0,
-                    "created_by": current_user["email"],
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                })
-                src_ent_id = str(src_res.inserted_id)
-                entities_created += 1
-            else:
-                src_ent_id = str(src_ent["_id"])
-                
-            tgt_ent = await db["entities"].find_one({"case_id": case_id, "name": tgt_name})
-            if not tgt_ent:
-                tgt_res = await db["entities"].insert_one({
-                    "case_id": case_id,
-                    "type": "PERSON",
-                    "name": tgt_name,
-                    "properties": {},
-                    "risk_score": 0.0,
-                    "created_by": current_user["email"],
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                })
-                tgt_ent_id = str(tgt_res.inserted_id)
-                entities_created += 1
-            else:
-                tgt_ent_id = str(tgt_ent["_id"])
-                
-            rel_type = record.get(type_key, "CONNECTED_TO") if type_key else "CONNECTED_TO"
-            rel_type = str(rel_type).upper()
-            
-            properties = {k: v for k, v in record.items() if k not in [src_key, tgt_key, type_key]}
-            
-            existing_rel = await db["relationships"].find_one({
-                "case_id": case_id,
-                "source_entity_id": src_ent_id,
-                "target_entity_id": tgt_ent_id,
-                "type": rel_type
-            })
-            
-            if not existing_rel:
-                rel_doc = {
-                    "case_id": case_id,
-                    "source_entity_id": src_ent_id,
-                    "target_entity_id": tgt_ent_id,
-                    "type": rel_type,
-                    "properties": properties,
-                    "evidence_ids": [],
-                    "created_by": current_user["email"],
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                }
-                await db["relationships"].insert_one(rel_doc)
-                relationships_created += 1
-                
+
+async def process_mapped_import_background(db, case_id: str, import_type: str, data: List[Dict[str, Any]], mappings: Dict[str, str], current_user: dict, evidence_id: str):
     ev_dict = {
         "case_id": case_id,
         "title": req.filename,
@@ -441,9 +104,14 @@ async def import_mapped_data(
     }
     ev_result = await db["evidence"].insert_one(ev_dict)
     
+    background_tasks.add_task(
+        process_mapped_import_background,
+        db, case_id, import_type, data, mappings, current_user, str(ev_result.inserted_id)
+    )
+    
     return {
-        "message": f"Mapped import processed successfully. Ingested {entities_created} entities and {relationships_created} relationships.",
+        "message": f"Mapped import processed successfully. Extraction running in background.",
         "evidence_id": str(ev_result.inserted_id),
-        "entities_created": entities_created,
-        "relationships_created": relationships_created
+        "entities_created": 0,
+        "relationships_created": 0
     }

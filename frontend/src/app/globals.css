@@ -1,5 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
-
+@import "./nexus-theme.css";
 /* Base fonts (Outfit and JetBrains Mono) are imported in layout.tsx via next/font */
 
 @custom-variant dark (&:where(.dark, .dark *));

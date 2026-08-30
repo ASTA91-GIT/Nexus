@@ -1,0 +1,101 @@
+@theme {
+  --color-nexus-bg-base: #050B16;
+  --color-nexus-bg-elevated: #081120;
+  --color-nexus-bg-panel: #0B1424;
+  
+  --color-nexus-accent-primary: #3B82F6;
+  --color-nexus-accent-secondary: #22D3EE;
+  --color-nexus-accent-violet: #7C3AED;
+  
+  --color-nexus-glass-border: rgba(59, 130, 246, 0.15);
+  --color-nexus-glass-borderHover: rgba(34, 211, 238, 0.35);
+  --color-nexus-glass-surface: rgba(255, 255, 255, 0.04);
+  --color-nexus-glass-surfaceHover: rgba(255, 255, 255, 0.07);
+  
+  --color-nexus-text-primary: #F3F6FB;
+  --color-nexus-text-secondary: #9AA7BD;
+  --color-nexus-text-muted: #5D6B85;
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  /* Since text-hero, text-display-lg are defined, we define them via text block */
+  --text-hero: clamp(3.5rem, 9vw, 8rem);
+  --text-hero--line-height: 0.95;
+  --text-hero--letter-spacing: -0.02em;
+
+  --text-display-lg: clamp(2.25rem, 5vw, 4rem);
+  --text-display-lg--line-height: 1.05;
+  --text-display-lg--letter-spacing: -0.01em;
+
+  --text-display-md: clamp(1.75rem, 3vw, 2.5rem);
+  --text-display-md--line-height: 1.15;
+  --text-display-md--letter-spacing: -0.01em;
+
+  --text-eyebrow: 0.75rem;
+  --text-eyebrow--line-height: 1;
+  --text-eyebrow--letter-spacing: 0.28em;
+
+  --spacing-section: clamp(5rem, 12vw, 10rem);
+  --spacing-section-sm: clamp(3rem, 6vw, 5rem);
+  --spacing-18: 4.5rem;
+  --spacing-22: 5.5rem;
+  --spacing-30: 7.5rem;
+
+  --container-content: 1440px;
+  --container-prose-wide: 56rem;
+
+  --blur-xs: 2px;
+  --blur-glass: 16px;
+
+  --shadow-glow-blue: 0 0 40px rgba(59, 130, 246, 0.25);
+  --shadow-glow-cyan: 0 0 40px rgba(34, 211, 238, 0.2);
+  --shadow-glow-violet: 0 0 50px rgba(124, 58, 237, 0.18);
+  --shadow-card: 0 20px 60px -20px rgba(0, 0, 0, 0.6);
+  --shadow-nav-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  --background-image-radial-core: radial-gradient(circle at center, rgba(59,130,246,0.25) 0%, rgba(34,211,238,0.08) 35%, transparent 70%);
+  --background-image-grid-fade: linear-gradient(180deg, transparent 0%, rgba(59,130,246,0.04) 50%, transparent 100%);
+
+  --animate-pulse-slow: pulse-slow 6s ease-in-out infinite;
+  --animate-drift: drift 18s ease-in-out infinite;
+  --animate-spin-slow: spin 40s linear infinite;
+  --animate-spin-reverse-slow: spin-reverse 55s linear infinite;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate3d(0,0,0); }
+  50% { transform: translate3d(0,-14px,0); }
+}
+
+@keyframes spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.glass-panel:hover {
+  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

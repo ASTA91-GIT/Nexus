@@ -9,7 +9,7 @@ const ESRI_MAP_STYLE = {
   version: 8 as const,
   sources: {
     'raster-tiles': {
-      type: 'raster',
+      type: 'raster' as const,
       tiles: [
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
       ],
@@ -20,7 +20,7 @@ const ESRI_MAP_STYLE = {
   layers: [
     {
       id: 'simple-tiles',
-      type: 'raster',
+      type: 'raster' as const,
       source: 'raster-tiles',
       minzoom: 0,
       maxzoom: 19
