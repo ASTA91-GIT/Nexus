@@ -1,17 +1,13 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useCase } from "@/context/CaseContext";
-import { ReactFlow, MiniMap, Controls, Background, useNodesState, useEdgesState, MarkerType } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import dagre from 'dagre';
 
 export default function TimelinePage() {
   const { activeCaseId } = useCase();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("ALL"); 
-  const [viewMode, setViewMode] = useState<"CHRONOLOGICAL" | "FLOW">("CHRONOLOGICAL");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
 
   const getApiUrl = (path: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
@@ -60,104 +56,7 @@ export default function TimelinePage() {
     });
   }, [events, searchTerm, categoryFilter]);
 
-  // React Flow setup
-  const { nodes, edges } = useMemo(() => {
-    if (viewMode !== "FLOW" || filteredEvents.length === 0) return { nodes: [], edges: [] };
-    
-    const newNodes = filteredEvents.map((evt, idx) => {
-      let bgColor = "#1e293b"; // surface-primary
-      let borderColor = "#334155"; // border-primary
-      let textColor = "#f8fafc";
-      
-      if (evt.category === "ENTITY") {
-        bgColor = "#0f172a";
-        borderColor = "#3b82f6";
-      } else if (evt.category === "RELATIONSHIP") {
-        bgColor = "#0f172a";
-        borderColor = "#8b5cf6";
-      } else if (evt.category === "EVIDENCE") {
-        bgColor = "#0f172a";
-        borderColor = "#10b981";
-      }
 
-      return {
-        id: `node-${idx}`,
-        position: { x: 250, y: idx * 180 },
-        data: {
-          label: (
-            <div className="flex flex-col gap-1 p-1 text-left min-w-[200px] max-w-[250px]">
-              <div className="flex justify-between items-start mb-1">
-                <span className="font-bold text-xs truncate" title={evt.title} style={{ color: textColor }}>{evt.title}</span>
-                <span className="text-[8px] px-1 py-0.5 rounded border opacity-80 uppercase" style={{ borderColor }}>{evt.category}</span>
-              </div>
-              <span className="text-[9px] font-mono opacity-70" style={{ color: textColor }}>
-                {new Date(evt.timestamp).toLocaleString(undefined, {
-                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                })}
-              </span>
-              <p className="text-[10px] mt-1 line-clamp-2 opacity-90" style={{ color: textColor }}>
-                {evt.message}
-              </p>
-            </div>
-          )
-        },
-        style: {
-          background: bgColor,
-          color: textColor,
-          border: `1px solid ${borderColor}`,
-          borderRadius: '8px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-        }
-      };
-    });
-
-    const newEdges = [];
-    for (let i = 0; i < filteredEvents.length - 1; i++) {
-      newEdges.push({
-        id: `e-${i}-${i+1}`,
-        source: `node-${i}`,
-        target: `node-${i+1}`,
-        animated: true,
-        style: { stroke: 'var(--border-secondary)', strokeWidth: 2 },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: 'var(--border-secondary)',
-        },
-      });
-    }
-
-    // Apply Dagre layout
-    const dagreGraph = new dagre.graphlib.Graph();
-    dagreGraph.setDefaultEdgeLabel(() => ({}));
-    dagreGraph.setGraph({ rankdir: 'LR', ranksep: 250, nodesep: 150 });
-
-    newNodes.forEach((node) => {
-      dagreGraph.setNode(node.id, { width: 250, height: 120 });
-    });
-    newEdges.forEach((edge) => {
-      dagreGraph.setEdge(edge.source, edge.target);
-    });
-    dagre.layout(dagreGraph);
-
-    const layoutedNodes = newNodes.map((node) => {
-      const nodeWithPosition = dagreGraph.node(node.id);
-      node.position = {
-        x: nodeWithPosition.x - 125,
-        y: nodeWithPosition.y - 60,
-      };
-      return node;
-    });
-
-    return { nodes: layoutedNodes, edges: newEdges };
-  }, [filteredEvents, viewMode]);
-
-  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState(nodes);
-  const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState(edges);
-
-  useEffect(() => {
-    setFlowNodes(nodes);
-    setFlowEdges(edges);
-  }, [nodes, edges, setFlowNodes, setFlowEdges]);
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full h-[calc(100vh-4rem)] pb-4">
@@ -185,7 +84,7 @@ export default function TimelinePage() {
         <div className="flex flex-col gap-4 flex-grow min-h-0 overflow-hidden px-2">
           {/* Controls Bar */}
           <div className="flex flex-wrap gap-4 items-center justify-between bg-[var(--surface-secondary)] p-4 border border-[var(--border-primary)] rounded-xl shrink-0 shadow-sm">
-            <div className="flex gap-4 items-center w-full md:w-auto">
+            <div className="flex gap-4 items-center w-full">
               <input 
                 type="text" 
                 placeholder="Search event logs..."
@@ -204,29 +103,7 @@ export default function TimelinePage() {
                 <option value="EVIDENCE">Evidence Ingested</option>
               </select>
             </div>
-            
-            <div className="flex bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-lg p-1">
-              <button
-                onClick={() => setViewMode("CHRONOLOGICAL")}
-                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                  viewMode === "CHRONOLOGICAL" 
-                    ? "bg-[var(--accent-primary)] text-white shadow-sm" 
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <i className="fa-solid fa-list-ul mr-1.5"></i> Chronological
-              </button>
-              <button
-                onClick={() => setViewMode("FLOW")}
-                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                  viewMode === "FLOW" 
-                    ? "bg-[var(--accent-primary)] text-white shadow-sm" 
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <i className="fa-solid fa-diagram-project mr-1.5"></i> Flow View
-              </button>
-            </div>
+
           </div>
 
           {/* Main Content Area */}
@@ -235,26 +112,6 @@ export default function TimelinePage() {
               <div className="absolute inset-0 flex flex-col items-center justify-center p-16 text-center text-[var(--text-muted)] bg-[var(--surface-secondary)]">
                 <i className="fa-regular fa-clock text-4xl mb-3 opacity-50"></i>
                 <p>No chronological events could be extracted from the current case evidence.</p>
-              </div>
-            ) : viewMode === "FLOW" ? (
-              <div className="absolute inset-0 z-0">
-                <ReactFlow 
-                  nodes={flowNodes}
-                  edges={flowEdges}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  fitView
-                  attributionPosition="bottom-right"
-                  className="bg-[var(--surface-tertiary)]"
-                >
-                  <Background color="var(--border-secondary)" gap={20} />
-                  <Controls className="bg-[var(--surface-primary)] border-[var(--border-primary)] fill-[var(--text-secondary)]" />
-                  <MiniMap 
-                    nodeColor={(n) => n.style?.background as string || '#334155'}
-                    maskColor="var(--surface-tertiary)"
-                    className="bg-[var(--surface-primary)] border-[var(--border-primary)] opacity-80" 
-                  />
-                </ReactFlow>
               </div>
             ) : (
               <div className="absolute inset-0 overflow-x-auto overflow-y-hidden p-6 scrollbar-thin flex items-center">

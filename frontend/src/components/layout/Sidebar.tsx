@@ -77,7 +77,7 @@ export default function Sidebar() {
 
   return (
     <aside 
-      className={`border-r border-[var(--border-primary)] bg-[var(--surface-primary)] flex flex-col z-20 shrink-0 transition-all duration-300 relative ${
+      className={`h-full border-r border-[var(--border-primary)] bg-[var(--surface-primary)] flex flex-col z-20 shrink-0 transition-all duration-300 relative ${
         collapsed ? "w-20" : "w-72"
       }`}
     >

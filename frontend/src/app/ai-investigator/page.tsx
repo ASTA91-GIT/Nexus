@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { useCase } from "@/context/CaseContext";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   sender: "user" | "ai";
@@ -104,7 +105,9 @@ export default function AiInvestigatorPage() {
                         ? "bg-gradient-to-br from-[var(--primary-accent)] to-blue-700 text-white rounded-2xl rounded-tr-sm" 
                         : "bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] rounded-2xl rounded-tl-sm"
                     }`}>
-                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                      <div className="whitespace-pre-wrap markdown-container">
+                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      </div>
 
                       {msg.evidence && msg.evidence.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-[var(--border-primary)] text-[10px] font-mono text-[var(--text-secondary)] space-y-1.5">
@@ -166,11 +169,14 @@ export default function AiInvestigatorPage() {
             </div>
             <div className="space-y-3 flex-1 overflow-y-auto">
               {[
-                "Who are the high risk entities?",
-                "How is John Doe connected to Alice Smith?",
-                "Why is Alice Smith high risk?",
-                "Summarize all activities from the last 24 hours.",
-                "Find all phone numbers linked to the primary suspect."
+                "Identify the shortest known relationship path between two entities in the active case.",
+                "Which entities currently present the highest cumulative investigative risk?",
+                "Highlight entities with unusually high relationship density.",
+                "Identify missing evidence required to strengthen the current investigation.",
+                "Summarize the strongest connections surrounding the highest-risk entity.",
+                "Are there any isolated entities with a disproportionately high risk score?",
+                "Identify potential financial or communication patterns across the active case.",
+                "Which relationships require further verification based on available evidence?"
               ].map((query, i) => (
                 <button 
                   key={i} onClick={() => handleSuggest(query)}

@@ -58,7 +58,8 @@ function NetworkNode({
   onNodeDragEnd,
   id,
   secondaryEntities,
-  avatar
+  avatar,
+  isModalOpen = false
 }: {
   position: [number, number, number];
   color: string;
@@ -73,12 +74,20 @@ function NetworkNode({
   id: string;
   secondaryEntities?: any[];
   avatar?: string;
+  isModalOpen?: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const isSuspicious = riskScore > 0.6 || type === "ALERT" || type === "HIGH_RISK";
   const baseSize = isSuspicious ? 1.15 : 0.75;
   const size = hovered ? baseSize * 1.25 : baseSize;
+
+  useEffect(() => {
+    if (isModalOpen) {
+      setHovered(false);
+    }
+  }, [isModalOpen]);
 
   useFrame((state) => {
     if (!meshRef.current) return;
@@ -90,11 +99,11 @@ function NetworkNode({
   });
 
   useEffect(() => {
-    document.body.style.cursor = hovered ? (isEditMode ? "grab" : "pointer") : "auto";
+    document.body.style.cursor = hovered && !isModalOpen ? (isEditMode ? "grab" : "pointer") : "auto";
     return () => {
       document.body.style.cursor = "auto";
     };
-  }, [hovered, isEditMode]);
+  }, [hovered, isEditMode, isModalOpen]);
 
   const opacity = dimmed ? 0.18 : 1;
 
@@ -102,14 +111,17 @@ function NetworkNode({
     <group
       position={isEditMode ? undefined : position}
       onPointerOver={(e) => {
+        if (isModalOpen) return;
         e.stopPropagation();
         setHovered(true);
       }}
       onPointerOut={(e) => {
+        if (isModalOpen) return;
         e.stopPropagation();
         setHovered(false);
       }}
       onClick={(e) => {
+        if (isModalOpen) return;
         e.stopPropagation();
         onClick?.();
       }}
@@ -138,7 +150,7 @@ function NetworkNode({
       </mesh>
 
       {/* HTML Billboard for Icon / Avatar */}
-      <Html center style={{ pointerEvents: 'none', zIndex: 100 }} zIndexRange={[100, 0]}>
+      <Html center style={{ pointerEvents: 'none', zIndex: 0 }} zIndexRange={[0, 0]}>
         <div 
           className={`flex items-center justify-center rounded-full overflow-hidden transition-all duration-300 ${dimmed && !hovered ? 'opacity-20' : 'opacity-100'}`}
           style={{ 
@@ -148,8 +160,8 @@ function NetworkNode({
             border: highlighted ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.1)'
           }}
         >
-          {avatar ? (
-            <img src={avatar} alt={name} className="w-full h-full object-cover" />
+          {avatar && !imgError ? (
+            <img src={avatar} alt={name} className="w-full h-full object-cover" onError={() => setImgError(true)} />
           ) : (
             <FontAwesomeIcon icon={getIconForType(type)} className="text-white drop-shadow-md" style={{ fontSize: `${size * 14}px`, color: '#ffffff' }} />
           )}
@@ -180,8 +192,8 @@ function NetworkNode({
         </Text>
       )}
       
-      {hovered && (
-        <Html position={[0, baseSize + 1.2, 0]} center zIndexRange={[200, 100]} style={{ pointerEvents: 'none', zIndex: 200 }}>
+      {hovered && !isModalOpen && (
+        <Html position={[0, baseSize + 1.2, 0]} center zIndexRange={[10, 5]} style={{ pointerEvents: 'none', zIndex: 10 }}>
           <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-4 min-w-[240px] text-left shadow-2xl backdrop-blur-md font-sans animate-fade-in pointer-events-none">
             <div className="flex justify-between items-start mb-2 border-b border-white/5 pb-2">
               <div className="flex items-center gap-2">
@@ -219,7 +231,7 @@ function NetworkNode({
     </group>
   );
 
-  if (isEditMode) {
+  if (isEditMode && !isModalOpen) {
     return (
       <group position={position}>
         <DragControls
@@ -239,6 +251,14 @@ function NetworkNode({
       </group>
     );
   }
+  
+  if (isEditMode && isModalOpen) {
+    return (
+      <group position={position}>
+        {nodeContent}
+      </group>
+    );
+  }
 
   return nodeContent;
 }
@@ -250,6 +270,7 @@ function NetworkEdge({
   highlighted,
   dimmed,
   onClick,
+  isModalOpen = false,
 }: {
   start: THREE.Vector3;
   end: THREE.Vector3;
@@ -257,6 +278,7 @@ function NetworkEdge({
   highlighted: boolean;
   dimmed: boolean;
   onClick?: () => void;
+  isModalOpen?: boolean;
 }) {
   const midPoint = useMemo(
     () => new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5),
@@ -285,16 +307,16 @@ function NetworkEdge({
 
   useEffect(() => {
     if (onClick) {
-      document.body.style.cursor = hovered ? "pointer" : "auto";
+      document.body.style.cursor = hovered && !isModalOpen ? "pointer" : "auto";
       return () => { document.body.style.cursor = "auto"; };
     }
-  }, [hovered, onClick]);
+  }, [hovered, onClick, isModalOpen]);
 
   return (
     <group 
-      onPointerOver={(e) => { if(onClick) { e.stopPropagation(); setHovered(true); } }}
-      onPointerOut={(e) => { if(onClick) { e.stopPropagation(); setHovered(false); } }}
-      onClick={(e) => { if (onClick) { e.stopPropagation(); onClick(); } }}
+      onPointerOver={(e) => { if(onClick && !isModalOpen) { e.stopPropagation(); setHovered(true); } }}
+      onPointerOut={(e) => { if(onClick && !isModalOpen) { e.stopPropagation(); setHovered(false); } }}
+      onClick={(e) => { if (onClick && !isModalOpen) { e.stopPropagation(); onClick(); } }}
     >
       <Line
         points={[start, end]}
@@ -331,7 +353,8 @@ export default function NetworkScene({
   highlightedPath = [],
   isEditMode = false,
   onNodeDragEnd,
-  draggedPositions = {}
+  draggedPositions = {},
+  isModalOpen = false
 }: {
   data: any;
   onNodeClick?: (node: any) => void;
@@ -340,6 +363,7 @@ export default function NetworkScene({
   isEditMode?: boolean;
   onNodeDragEnd?: (id: string, x: number, y: number, z: number) => void;
   draggedPositions?: Record<string, {x: number, y: number, z: number}>;
+  isModalOpen?: boolean;
 }) {
   const nodes = useMemo(() => {
     const rawNodes = data?.nodes || [];
@@ -510,6 +534,7 @@ export default function NetworkScene({
             highlighted={edge.highlighted}
             dimmed={hasHighlight && !edge.highlighted}
             onClick={isEditMode ? () => onEdgeClick?.(edge) : undefined}
+            isModalOpen={isModalOpen}
           />
         ))}
 
@@ -531,11 +556,12 @@ export default function NetworkScene({
               onNodeDragEnd={onNodeDragEnd}
               secondaryEntities={node.secondaryEntities}
               avatar={node.properties?.avatar_url || node.properties?.avatar || node.avatar_url || node.avatar}
+              isModalOpen={isModalOpen}
             />
           );
         })}
 
-        <OrbitControls makeDefault enableDamping dampingFactor={0.08} maxDistance={90} minDistance={8} />
+        <OrbitControls makeDefault enableDamping dampingFactor={0.08} maxDistance={90} minDistance={8} enabled={!isModalOpen} />
       </Canvas>
     </div>
   );

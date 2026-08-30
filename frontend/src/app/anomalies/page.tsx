@@ -20,8 +20,8 @@ export default function AnomaliesDashboard() {
   const [viewMode, setViewMode] = useState<"LIST" | "GRAPH">("LIST");
   
   // React Flow state
-  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState([]);
-  const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState([]);
+  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState<any>([]);
+  const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState<any>([]);
 
   const getApiUrl = (path: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";

@@ -2,28 +2,31 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useCase } from "@/context/CaseContext";
-import "leaflet/dist/leaflet.css";
+import 'maplibre-gl/dist/maplibre-gl.css';
+import Map, { Marker, Popup, MapRef } from 'react-map-gl/maplibre';
 
-// Fix Leaflet Default Icon issue in Next.js
-import L from "leaflet";
-const iconRetinaUrl = '/leaflet/marker-icon-2x.png';
-const iconUrl = '/leaflet/marker-icon.png';
-const shadowUrl = '/leaflet/marker-shadow.png';
-if (typeof window !== "undefined") {
-  delete (L.Icon.Default.prototype as any)._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  });
-}
-
-// Dynamically import react-leaflet components (they rely on window)
-const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLayer), { ssr: false });
-const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { ssr: false });
-const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ssr: false });
-const MapUpdater = dynamic(() => import("./MapUpdater"), { ssr: false });
+const ESRI_MAP_STYLE = {
+  version: 8 as const,
+  sources: {
+    'raster-tiles': {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
+      ],
+      tileSize: 256,
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+    }
+  },
+  layers: [
+    {
+      id: 'simple-tiles',
+      type: 'raster',
+      source: 'raster-tiles',
+      minzoom: 0,
+      maxzoom: 19
+    }
+  ]
+};
 
 export default function LocationsPage() {
   const { activeCaseId, activeCase } = useCase();
@@ -32,6 +35,17 @@ export default function LocationsPage() {
   const [evidenceList, setEvidenceList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<any | null>(null);
+  const mapRef = React.useRef<MapRef>(null);
+
+  useEffect(() => {
+    if (selectedLocation && selectedLocation.hasCoords && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [selectedLocation.lng, selectedLocation.lat],
+        zoom: 14,
+        duration: 1500
+      });
+    }
+  }, [selectedLocation]);
 
   const getApiUrl = (path: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
@@ -170,16 +184,15 @@ export default function LocationsPage() {
     });
   }, [entities, relationships, evidenceList, geocodedLocations]);
 
-  // Map center logic
   const mapCenter = useMemo(() => {
     if (selectedLocation && selectedLocation.hasCoords) {
-      return [selectedLocation.lat, selectedLocation.lng] as [number, number];
+      return { longitude: selectedLocation.lng, latitude: selectedLocation.lat, zoom: 14 };
     }
     const validLocs = locations.filter(l => l.hasCoords);
     if (validLocs.length > 0) {
-      return [validLocs[0].lat, validLocs[0].lng] as [number, number];
+      return { longitude: validLocs[0].lng, latitude: validLocs[0].lat, zoom: 3 };
     }
-    return [0, 0] as [number, number]; // Default to equator if nothing is found
+    return { longitude: 0, latitude: 0, zoom: 2 }; // Default to equator if nothing is found
   }, [locations, selectedLocation]);
 
   return (
@@ -278,74 +291,80 @@ export default function LocationsPage() {
               </div>
             ) : (
               <div className="absolute inset-0 z-0">
-                <MapContainer 
-                  center={mapCenter} 
-                  zoom={selectedLocation ? 14 : 3} 
-                  scrollWheelZoom={true} 
-                  style={{ height: '100%', width: '100%', background: 'var(--surface-tertiary)' }}
+                <Map
+                  ref={mapRef}
+                  initialViewState={mapCenter}
+                  mapStyle={ESRI_MAP_STYLE}
+                  style={{ width: '100%', height: '100%' }}
+                  attributionControl={false}
                 >
-                  <TileLayer
-                    attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                    className="map-tiles"
-                  />
-                  <MapUpdater selectedLocation={selectedLocation} />
                   {locations.filter(l => l.hasCoords).map((loc) => (
                     <Marker 
-                      key={loc._id} 
-                      position={[loc.lat, loc.lng]}
-                      eventHandlers={{
-                        click: () => {
-                          setSelectedLocation(loc);
-                        },
+                      key={`marker-${loc._id}`} 
+                      longitude={loc.lng}
+                      latitude={loc.lat}
+                      onClick={e => {
+                        e.originalEvent.stopPropagation();
+                        setSelectedLocation(loc);
                       }}
-                    >
-                      <Popup className="custom-popup">
-                        <div className="flex flex-col gap-3 min-w-[200px]">
-                          <div className="border-b border-gray-200 pb-2">
-                            <h3 className="font-bold text-gray-900 text-base">{loc.name}</h3>
-                            <p className="text-xs text-gray-500 font-mono mt-1">{loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}</p>
-                          </div>
-                          
-                          {loc.associatedEntities && loc.associatedEntities.length > 0 && (
-                            <div>
-                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Connected Entities</p>
-                              <div className="max-h-24 overflow-y-auto space-y-1">
-                                {loc.associatedEntities.map((ae: any, i: number) => (
-                                  <div key={i} className="text-xs text-gray-700 flex justify-between">
-                                    <span>• {ae.entity.name}</span>
-                                    <span className="text-[9px] bg-gray-100 px-1 rounded text-gray-500">{ae.type}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {loc.relatedEvidence && loc.relatedEvidence.length > 0 && (
-                            <div>
-                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Related Evidence</p>
-                              <div className="max-h-24 overflow-y-auto space-y-1">
-                                {loc.relatedEvidence.map((ev: any, i: number) => (
-                                  <div key={i} className="text-xs text-blue-600 truncate" title={ev.title}>
-                                    <i className="fa-solid fa-file-shield mr-1"></i> {ev.title}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {loc.risk_score > 0 && (
-                            <div className="mt-1 pt-2 border-t border-gray-200">
-                              <span className={`text-[10px] font-bold px-2 py-1 rounded ${loc.risk_score > 7 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
-                                Risk Index: {loc.risk_score}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </Popup>
-                    </Marker>
+                      color="var(--accent-primary)"
+                    />
                   ))}
-                </MapContainer>
+                  
+                  {selectedLocation && selectedLocation.hasCoords && (
+                    <Popup
+                      longitude={selectedLocation.lng}
+                      latitude={selectedLocation.lat}
+                      anchor="bottom"
+                      onClose={() => setSelectedLocation(null)}
+                      closeOnClick={false}
+                      className="custom-popup"
+                      offset={30}
+                    >
+                      <div className="flex flex-col gap-3 min-w-[200px] max-w-[300px] text-black">
+                        <div className="border-b border-gray-200 pb-2">
+                          <h3 className="font-bold text-gray-900 text-base">{selectedLocation.name}</h3>
+                          <p className="text-xs text-gray-500 font-mono mt-1">{selectedLocation.lat.toFixed(5)}, {selectedLocation.lng.toFixed(5)}</p>
+                        </div>
+                        
+                        {selectedLocation.associatedEntities && selectedLocation.associatedEntities.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Connected Entities</p>
+                            <div className="max-h-24 overflow-y-auto space-y-1">
+                              {selectedLocation.associatedEntities.map((ae: any, i: number) => (
+                                <div key={i} className="text-xs text-gray-700 flex justify-between">
+                                  <span>• {ae.entity.name}</span>
+                                  <span className="text-[9px] bg-gray-100 px-1 rounded text-gray-500">{ae.type}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedLocation.relatedEvidence && selectedLocation.relatedEvidence.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Related Evidence</p>
+                            <div className="max-h-24 overflow-y-auto space-y-1">
+                              {selectedLocation.relatedEvidence.map((ev: any, i: number) => (
+                                <div key={i} className="text-xs text-blue-600 truncate" title={ev.title}>
+                                  <i className="fa-solid fa-file-shield mr-1"></i> {ev.title}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedLocation.risk_score > 0 && (
+                          <div className="mt-1 pt-2 border-t border-gray-200">
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${selectedLocation.risk_score > 7 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                              Risk Index: {selectedLocation.risk_score}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </Popup>
+                  )}
+                </Map>
 
                 {/* Tracking status overlay */}
                 <div className="absolute bottom-4 right-4 z-[400] pointer-events-none">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export function ConfirmDeleteModal({
   isOpen,
@@ -15,10 +16,13 @@ export function ConfirmDeleteModal({
   message: string;
   isLoading: boolean;
 }) {
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-md overflow-y-auto">
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/90 backdrop-blur-md overflow-y-auto">
       <div className="relative z-[9999] bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 w-[400px] shadow-2xl flex flex-col gap-4 m-auto">
         <h2 className="text-lg font-bold text-[var(--danger)] uppercase tracking-wider flex items-center gap-2">
           <i className="fa-solid fa-triangle-exclamation"></i> {title}
@@ -34,7 +38,8 @@ export function ConfirmDeleteModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -73,12 +78,15 @@ export function EntityModal({
     }
   }, [entity, isOpen]);
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
 
   const isAiExtracted = entity?.source === "AI_EXTRACTED";
 
-  return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-md overflow-y-auto py-10">
+  return createPortal(
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/90 backdrop-blur-md overflow-y-auto py-10">
       <div className="relative z-[9999] bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 w-[500px] shadow-2xl flex flex-col gap-4 m-auto">
         <h2 className="text-lg font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-2">
           {entity ? <i className="fa-solid fa-pen"></i> : <i className="fa-solid fa-plus"></i>}
@@ -153,7 +161,8 @@ export function EntityModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -196,10 +205,13 @@ export function RelationshipModal({
     }
   }, [relationship, isOpen]);
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-md overflow-y-auto py-10">
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/90 backdrop-blur-md overflow-y-auto py-10">
       <div className="relative z-[9999] bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 w-[500px] shadow-2xl flex flex-col gap-4 m-auto">
         <h2 className="text-lg font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-2">
           {relationship ? <i className="fa-solid fa-pen"></i> : <i className="fa-solid fa-link"></i>}
@@ -274,6 +286,7 @@ export function RelationshipModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

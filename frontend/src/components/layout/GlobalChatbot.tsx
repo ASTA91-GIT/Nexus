@@ -228,7 +228,9 @@ export default function GlobalChatbot() {
                       : "bg-zinc-900 border-white/5 text-zinc-300 rounded-tl-none shadow-md overflow-hidden"
                   }`}>
                     {msg.sender === "ai" ? (
-                      <ReactMarkdown className="prose prose-invert prose-sm max-w-none text-[11px] prose-p:leading-relaxed prose-headings:text-white prose-a:text-blue-400 marker:text-zinc-500 prose-ul:my-1 prose-li:my-0">{msg.text}</ReactMarkdown>
+                      <div className="prose prose-invert prose-sm max-w-none text-[11px] prose-p:leading-relaxed prose-headings:text-white prose-a:text-blue-400 marker:text-zinc-500 prose-ul:my-1 prose-li:my-0">
+                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      </div>
                     ) : (
                       <p className="whitespace-pre-wrap">{msg.text}</p>
                     )}

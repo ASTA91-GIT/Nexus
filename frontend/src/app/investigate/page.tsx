@@ -31,6 +31,8 @@ export default function InvestigatePage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSavingModal, setIsSavingModal] = useState(false);
 
+  const isModalOpen = isEntityModalOpen || isRelModalOpen || isDeleteModalOpen || isSavingModal;
+
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
@@ -546,6 +548,7 @@ export default function InvestigatePage() {
               isEditMode={isEditMode}
               onNodeDragEnd={handleNodeDragEnd}
               draggedPositions={draggedPositions}
+              isModalOpen={isModalOpen}
             />
           )}
 

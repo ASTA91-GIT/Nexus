@@ -2,9 +2,17 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useCase } from "@/context/CaseContext";
 
+import dynamic from "next/dynamic";
+
+const PDFDownloadLink = dynamic(() => import('@react-pdf/renderer').then(mod => mod.PDFDownloadLink), { ssr: false });
+import CaseReportPDF from '@/components/reports/CaseReportPDF';
+
 export default function ReportsPage() {
   const { activeCaseId, activeCase } = useCase();
   const [reportData, setReportData] = useState<any>(null);
+  const [entities, setEntities] = useState<any[]>([]);
+  const [relationships, setRelationships] = useState<any[]>([]);
+  const [evidenceList, setEvidenceList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const getApiUrl = (path: string) => {
@@ -20,9 +28,16 @@ export default function ReportsPage() {
       const res = await fetch(getApiUrl(`/api/reports/?case_id=${activeCaseId}`), {
         headers: { Authorization: `Bearer ${token}` }
       });
+      const entRes = await fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } });
+      const relRes = await fetch(getApiUrl(`/api/relationships/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } });
+      const evRes = await fetch(getApiUrl(`/api/evidence/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } });
+      
       if (res.ok) {
         const data = await res.json();
         setReportData(data);
+        if (entRes.ok) setEntities(await entRes.json());
+        if (relRes.ok) setRelationships(await relRes.json());
+        if (evRes.ok) setEvidenceList(await evRes.json());
       } else {
         console.error("Failed to generate report");
       }
@@ -33,9 +48,7 @@ export default function ReportsPage() {
     }
   }, [activeCaseId]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+
 
   if (!activeCaseId) {
     return (
@@ -73,13 +86,14 @@ export default function ReportsPage() {
             {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
             {loading ? "Synthesizing..." : "Generate AI Report"}
           </button>
-          {reportData && (
-            <button
-              onClick={handlePrint}
+          {reportData && typeof window !== "undefined" && (
+            <PDFDownloadLink
+              document={<CaseReportPDF caseData={activeCase} entities={entities} relationships={relationships} evidence={evidenceList} />}
+              fileName={`NEXUS_Report_${activeCase?.name.replace(/\s+/g, '_')}.pdf`}
               className="px-5 py-2.5 bg-[var(--surface-secondary)] hover:bg-[var(--surface-hover)] border border-[var(--border-primary)] text-[var(--text-primary)] rounded-xl font-bold text-sm transition-all shadow-sm flex items-center gap-2"
             >
-              <i className="fa-solid fa-print"></i> Export PDF
-            </button>
+              <i className="fa-solid fa-download"></i> Download PDF
+            </PDFDownloadLink>
           )}
         </div>
       </div>

@@ -38,7 +38,7 @@ export default function GraphEditorControls({
   const hasSelection = !!selectedEntity || !!selectedRelationship;
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-wrap justify-center items-center gap-2 md:gap-4 p-3 bg-[var(--surface-primary)]/90 border border-[var(--border-primary)] rounded-2xl backdrop-blur-md shadow-2xl w-[96%] max-w-3xl overflow-visible">
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-wrap justify-center items-center gap-2 md:gap-4 p-3 bg-[var(--surface-primary)]/90 border border-[var(--border-primary)] rounded-2xl backdrop-blur-md shadow-2xl w-[96%] max-w-3xl overflow-visible">
       <div className="flex bg-[var(--surface-secondary)] rounded-full p-1 border border-[var(--border-primary)]/50">
         <button
           onClick={() => setIsEditMode(false)}
