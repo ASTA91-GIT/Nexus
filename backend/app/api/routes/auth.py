@@ -97,3 +97,18 @@ async def get_admin_user(current_user=Depends(get_current_user)):
 @router.get("/me", response_model=UserOut)
 async def read_users_me(current_user=Depends(get_current_user)):
     return current_user
+
+from fastapi import UploadFile, File
+import base64
+
+@router.post("/profile/avatar")
+async def upload_avatar(file: UploadFile = File(...), current_user=Depends(get_current_user), db=Depends(get_database)):
+    content = await file.read()
+    b64 = base64.b64encode(content).decode("utf-8")
+    data_url = f"data:{file.content_type};base64,{b64}"
+    
+    await db["users"].update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"avatar": data_url}}
+    )
+    return {"message": "Avatar updated successfully", "avatar_url": data_url}

@@ -33,33 +33,39 @@ async def get_timeline(case_id: str, db=Depends(get_database), current_user=Depe
                 "properties": props
             })
             
-    # 3. Add evidence uploads
-    for ev in evidence:
-        events.append({
-            "event_id": str(ev["_id"]),
-            "timestamp": ev["created_at"].isoformat() if hasattr(ev["created_at"], "isoformat") else str(ev["created_at"]),
-            "type": "EVIDENCE_INGESTED",
-            "category": "EVIDENCE",
-            "title": "Evidence Ingested",
-            "message": f"Document '{ev['title']}' ({ev['source_type']}) was successfully uploaded and indexed.",
-            "properties": {"uploader": ev["created_by"]}
-        })
-        
-    # 4. Add entities created
+    # Removed evidence uploads to ensure only real extracted data is used
+    # 4. Add entities with temporal significance
     for ent in entities:
-        events.append({
-            "event_id": str(ent["_id"]),
-            "timestamp": ent["created_at"].isoformat() if hasattr(ent["created_at"], "isoformat") else str(ent["created_at"]),
-            "type": "ENTITY_CREATED",
-            "category": "ENTITY",
-            "title": "Suspect Identified",
-            "message": f"New entity '{ent['name']}' ({ent['type']}) registered in the case log.",
-            "properties": {"risk_score": ent.get("risk_score", 0.0)}
-        })
+        props = ent.get("properties", {})
+        t_str = props.get("timestamp") or props.get("date") or props.get("time")
         
-    # Sort events by timestamp descending
+        if t_str or ent.get("type") in ["EVENT", "COMMUNICATION"]:
+            event_time = t_str if t_str else (ent["created_at"].isoformat() if hasattr(ent["created_at"], "isoformat") else str(ent["created_at"]))
+            
+            ent_type = ent.get('type', 'UNKNOWN')
+            title = f"{ent_type.capitalize()} Logged: {ent['name']}"
+            if ent_type == "EVENT":
+                title = ent['name']
+            elif ent_type == "COMMUNICATION":
+                title = f"Communication Intercept: {ent['name']}"
+                
+            desc = ent.get("description", "")
+            if not desc:
+                desc = f"Subject '{ent['name']}' was registered as a {ent_type.lower()} in the intelligence database."
+                
+            events.append({
+                "event_id": str(ent["_id"]),
+                "timestamp": event_time,
+                "type": f"ENTITY_{ent_type}",
+                "category": "ENTITY",
+                "title": title,
+                "message": desc,
+                "properties": {"risk_score": ent.get("risk_score", 0.0), **props}
+            })
+        
+    # Sort events chronologically (ascending)
     def get_timestamp_key(evt):
         return str(evt["timestamp"])
         
-    events.sort(key=get_timestamp_key, reverse=True)
+    events.sort(key=get_timestamp_key, reverse=False)
     return events

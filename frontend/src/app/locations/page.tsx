@@ -1,11 +1,35 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useCase } from "@/context/CaseContext";
+import "leaflet/dist/leaflet.css";
+
+// Fix Leaflet Default Icon issue in Next.js
+import L from "leaflet";
+const iconRetinaUrl = '/leaflet/marker-icon-2x.png';
+const iconUrl = '/leaflet/marker-icon.png';
+const shadowUrl = '/leaflet/marker-shadow.png';
+if (typeof window !== "undefined") {
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  });
+}
+
+// Dynamically import react-leaflet components (they rely on window)
+const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), { ssr: false });
+const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLayer), { ssr: false });
+const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { ssr: false });
+const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ssr: false });
+const MapUpdater = dynamic(() => import("./MapUpdater"), { ssr: false });
 
 export default function LocationsPage() {
-  const { activeCaseId } = useCase();
+  const { activeCaseId, activeCase } = useCase();
   const [entities, setEntities] = useState<any[]>([]);
   const [relationships, setRelationships] = useState<any[]>([]);
+  const [evidenceList, setEvidenceList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<any | null>(null);
 
@@ -18,6 +42,7 @@ export default function LocationsPage() {
     if (!activeCaseId) {
       setEntities([]);
       setRelationships([]);
+      setEvidenceList([]);
       setLoading(false);
       return;
     }
@@ -29,19 +54,25 @@ export default function LocationsPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
       let ents: any[] = [];
-      if (entRes.ok) {
-        ents = await entRes.json();
-        setEntities(ents);
-      }
+      if (entRes.ok) ents = await entRes.json();
 
       // Fetch Relationships
       const relRes = await fetch(getApiUrl(`/api/relationships/?case_id=${activeCaseId}`), {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (relRes.ok) {
-        const rels = await relRes.json();
-        setRelationships(rels);
-      }
+      let rels: any[] = [];
+      if (relRes.ok) rels = await relRes.json();
+      
+      // Fetch Evidence
+      const evRes = await fetch(getApiUrl(`/api/evidence/?case_id=${activeCaseId}`), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      let evs: any[] = [];
+      if (evRes.ok) evs = await evRes.json();
+
+      setEntities(ents);
+      setRelationships(rels);
+      setEvidenceList(evs);
     } catch (err) {
       console.error(err);
     } finally {
@@ -53,105 +84,142 @@ export default function LocationsPage() {
     fetchLocationsData();
   }, [fetchLocationsData]);
 
-  // Extract locations from entities containing coordinates
+  // Try to geocode locations that lack coordinates using OpenStreetMap Nominatim
+  const [geocodedLocations, setGeocodedLocations] = useState<Record<string, { lat: number; lng: number }>>({});
+  
+  useEffect(() => {
+    const geocodeLocations = async () => {
+      const locsToGeocode = entities.filter(ent => ent.type === "LOCATION" && (!ent.properties?.lat && !ent.properties?.latitude));
+      if (locsToGeocode.length === 0) return;
+      
+      const newGeocoded: Record<string, { lat: number; lng: number }> = {};
+      
+      for (const loc of locsToGeocode) {
+        if (geocodedLocations[loc._id]) continue; // Already geocoded or tried
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc.name)}&format=json&limit=1`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.length > 0) {
+              newGeocoded[loc._id] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+            }
+          }
+          // Sleep to respect Nominatim API rate limit (1 req/sec)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch(e) {
+          console.error(`Failed to geocode ${loc.name}`, e);
+        }
+      }
+      
+      if (Object.keys(newGeocoded).length > 0) {
+        setGeocodedLocations(prev => ({ ...prev, ...newGeocoded }));
+      }
+    };
+    
+    geocodeLocations();
+  }, [entities]);
+
+  // Compute final locations
   const locations = useMemo(() => {
     return entities.filter((ent: any) => {
       const props = ent.properties || {};
-      const hasLat = props.latitude !== undefined || props.lat !== undefined;
-      const hasLng = props.longitude !== undefined || props.lng !== undefined;
-      return ent.type === "LOCATION" || (hasLat && hasLng);
+      const hasPropsCoords = props.latitude !== undefined || props.lat !== undefined;
+      const hasGeoCoords = !!geocodedLocations[ent._id];
+      return ent.type === "LOCATION" || hasPropsCoords || hasGeoCoords;
     }).map((ent: any) => {
       const props = ent.properties || {};
-      const lat = parseFloat(props.latitude || props.lat || 0.0);
-      const lng = parseFloat(props.longitude || props.lng || 0.0);
+      let lat = null;
+      let lng = null;
+      let hasCoords = false;
+      
+      if (props.latitude !== undefined || props.lat !== undefined) {
+        lat = parseFloat(props.latitude || props.lat);
+        lng = parseFloat(props.longitude || props.lng);
+        hasCoords = true;
+      } else if (geocodedLocations[ent._id]) {
+        lat = geocodedLocations[ent._id].lat;
+        lng = geocodedLocations[ent._id].lng;
+        hasCoords = true;
+      }
+      
+      const associated = relationships
+        .filter((rel: any) => rel.source_entity_id === ent._id || rel.target_entity_id === ent._id)
+        .map((rel: any) => {
+          const otherId = rel.source_entity_id === ent._id ? rel.target_entity_id : rel.source_entity_id;
+          return {
+            entity: entities.find(e => e._id === otherId),
+            type: rel.type
+          };
+        })
+        .filter(item => item.entity);
+        
+      const relatedEvidence = relationships
+        .filter((rel: any) => (rel.source_entity_id === ent._id || rel.target_entity_id === ent._id) && rel.evidence_ids && rel.evidence_ids.length > 0)
+        .flatMap((rel: any) => rel.evidence_ids)
+        .map(evId => evidenceList.find(ev => ev._id === evId))
+        .filter(Boolean);
+
       return {
         ...ent,
-        lat: lat,
-        lng: lng,
+        lat,
+        lng,
+        hasCoords,
+        associatedEntities: associated,
+        relatedEvidence: [...new Set(relatedEvidence)]
       };
     });
-  }, [entities]);
+  }, [entities, relationships, evidenceList, geocodedLocations]);
 
-  // Find connections between locations
-  const locationTracks = useMemo(() => {
-    if (locations.length === 0) return [];
-    
-    // Map relationships that link these locations
-    const tracks: any[] = [];
-    relationships.forEach((rel) => {
-      const srcLoc = locations.find((l) => l._id === rel.source_entity_id);
-      const tgtLoc = locations.find((l) => l._id === rel.target_entity_id);
-      if (srcLoc && tgtLoc) {
-        tracks.push({
-          id: rel._id,
-          type: rel.type,
-          from: srcLoc,
-          to: tgtLoc
-        });
-      }
-    });
-    return tracks;
-  }, [relationships, locations]);
-
-  // Calculate coordinates bounds for rendering coordinate grid
-  const bounds = useMemo(() => {
-    if (locations.length === 0) {
-      return { minLat: -90, maxLat: 90, minLng: -180, maxLng: 180 };
+  // Map center logic
+  const mapCenter = useMemo(() => {
+    if (selectedLocation && selectedLocation.hasCoords) {
+      return [selectedLocation.lat, selectedLocation.lng] as [number, number];
     }
-    const lats = locations.map(l => l.lat);
-    const lngs = locations.map(l => l.lng);
-    const minLat = Math.min(...lats) - 1;
-    const maxLat = Math.max(...lats) + 1;
-    const minLng = Math.min(...lngs) - 1;
-    const maxLng = Math.max(...lngs) + 1;
-    return { minLat, maxLat, minLng, maxLng };
-  }, [locations]);
-
-  // Convert lat/lng to SVG pixel percentages
-  const getCoordinates = useCallback((lat: number, lng: number) => {
-    const { minLat, maxLat, minLng, maxLng } = bounds;
-    const latSpan = maxLat - minLat || 1;
-    const lngSpan = maxLng - minLng || 1;
-    
-    // In SVG, Y-axis goes from top to bottom
-    const y = 100 - ((lat - minLat) / latSpan) * 100;
-    const x = ((lng - minLng) / lngSpan) * 100;
-    
-    return { x: `${x}%`, y: `${y}%` };
-  }, [bounds]);
+    const validLocs = locations.filter(l => l.hasCoords);
+    if (validLocs.length > 0) {
+      return [validLocs[0].lat, validLocs[0].lng] as [number, number];
+    }
+    return [0, 0] as [number, number]; // Default to equator if nothing is found
+  }, [locations, selectedLocation]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] w-full gap-4 relative overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] w-full gap-4 relative overflow-hidden pb-4">
       {/* Header */}
-      <div className="border-b border-white/5 pb-4 shrink-0">
-        <h1 className="text-2xl font-extrabold tracking-tight">Geographic Intelligence Mapping</h1>
-        <p className="text-sm text-zinc-500 mt-1">
+      <div className="border-b border-[var(--border-primary)] pb-4 shrink-0 px-2">
+        <h1 className="text-2xl font-extrabold tracking-tight text-[var(--text-primary)]">Geographic Intelligence Mapping</h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
           Coordinate tracking of flagged operational activity clusters and suspect movement channels.
         </p>
       </div>
 
       {!activeCaseId ? (
-        <div className="p-16 border border-dashed border-white/5 rounded-2xl text-center text-zinc-600 flex-grow">
-          Please select an active Case File from the sidebar to load geographic intelligence.
+        <div className="p-16 border border-dashed border-[var(--border-primary)] rounded-2xl text-center text-[var(--text-muted)] bg-[var(--surface-secondary)] m-2 flex-grow flex items-center justify-center">
+          <div>
+            <i className="fa-solid fa-map-location-dot text-4xl mb-3 opacity-50"></i>
+            <p>Please select an active Case File from the sidebar to load geographic intelligence.</p>
+          </div>
         </div>
       ) : loading ? (
-        <div className="p-16 flex flex-col items-center justify-center gap-3 flex-grow">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-          <span className="text-xs text-zinc-500">Processing case coordinates data...</span>
+        <div className="p-16 flex flex-col items-center justify-center gap-3 flex-grow bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl m-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[var(--accent-primary)]"></div>
+          <span className="text-xs text-[var(--text-secondary)]">Processing case coordinates data...</span>
         </div>
       ) : (
-        <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0 overflow-hidden px-2">
           
           {/* Left panel: Locations list directory */}
-          <aside className="w-80 border border-white/5 bg-zinc-900/10 p-5 rounded-2xl flex flex-col gap-4 backdrop-blur-sm shrink-0 overflow-y-auto">
-            <div>
-              <h2 className="text-sm font-bold text-zinc-300">📍 Flagged Coordinates</h2>
-              <p className="text-[10px] text-zinc-500 font-mono mt-0.5">CASE LOCATIONS DIRECTORY</p>
+          <aside className="w-full md:w-80 border border-[var(--border-primary)] bg-[var(--surface-primary)] p-5 rounded-2xl flex flex-col gap-4 shadow-sm shrink-0 overflow-y-auto">
+            <div className="border-b border-[var(--border-primary)] pb-3">
+              <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                <i className="fa-solid fa-map-location-dot text-[var(--accent-primary)]"></i> Flagged Coordinates
+              </h2>
+              <p className="text-[10px] text-[var(--text-muted)] font-bold mt-1 uppercase tracking-wider">Case Locations Directory</p>
             </div>
 
             {locations.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-center p-6 text-zinc-600 text-xs italic">
-                No coordinate properties (latitude/longitude) detected on suspect entities in this case.
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-[var(--text-muted)] text-xs italic bg-[var(--surface-secondary)] rounded-xl border border-dashed border-[var(--border-primary)]">
+                <i className="fa-solid fa-globe text-3xl mb-2 opacity-50"></i>
+                No locations or coordinate properties detected in this case.
               </div>
             ) : (
               <div className="flex-1 space-y-2">
@@ -159,16 +227,32 @@ export default function LocationsPage() {
                   <div
                     key={loc._id}
                     onClick={() => setSelectedLocation(loc)}
-                    className={`p-3.5 rounded-xl border cursor-pointer transition-all space-y-1.5 ${
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all space-y-2 shadow-sm ${
                       selectedLocation?._id === loc._id
-                        ? "bg-blue-600/10 border-blue-500/20 text-white"
-                        : "bg-zinc-950/40 border-white/5 text-zinc-400 hover:text-zinc-200"
+                        ? "bg-[var(--accent-primary)]/10 border-[var(--accent-primary)]/40 ring-1 ring-[var(--accent-primary)]/20"
+                        : "bg-[var(--surface-secondary)] border-[var(--border-primary)] hover:border-[var(--border-secondary)] hover:bg-[var(--surface-hover)]"
                     }`}
                   >
-                    <p className="font-bold text-sm truncate">{loc.name}</p>
-                    <div className="flex justify-between items-center text-[10px] text-zinc-500 font-mono">
-                      <span>Lat: {loc.lat.toFixed(4)}</span>
-                      <span>Lng: {loc.lng.toFixed(4)}</span>
+                    <div className="flex justify-between items-start">
+                      <p className="font-bold text-sm text-[var(--text-primary)] truncate" title={loc.name}>{loc.name}</p>
+                      {loc.risk_score > 0 && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${loc.risk_score > 7 ? 'bg-[var(--danger)]/20 text-[var(--danger)]' : 'bg-[var(--warning)]/20 text-[var(--warning)]'}`}>
+                          Risk: {loc.risk_score}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-[10px] font-mono">
+                      {loc.hasCoords ? (
+                        <span className="text-[var(--text-secondary)]">
+                          <i className="fa-solid fa-location-crosshairs mr-1"></i>
+                          {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
+                        </span>
+                      ) : (
+                        <span className="text-[var(--warning)]">
+                          <i className="fa-solid fa-triangle-exclamation mr-1"></i> Coordinates unavailable
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -177,86 +261,105 @@ export default function LocationsPage() {
           </aside>
 
           {/* Center Map Grid Visualization */}
-          <main className="flex-1 border border-white/5 bg-zinc-950/60 rounded-2xl relative overflow-hidden flex flex-col">
-            {locations.length === 0 ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
-                <span className="text-3xl mb-3">📍</span>
-                <p className="text-zinc-500 text-sm">No Location Records Available</p>
-                <p className="text-xs text-zinc-600 mt-1 max-w-sm leading-relaxed">
-                  Ingest evidence files with latitude (or lat) and longitude (or lng) keys to plot active coordinate points.
+          <main className="flex-1 border border-[var(--border-primary)] bg-[var(--surface-primary)] rounded-2xl relative overflow-hidden flex flex-col shadow-sm">
+            {locations.filter(l => l.hasCoords).length === 0 ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 bg-[var(--surface-secondary)]">
+                <i className="fa-solid fa-map text-5xl mb-4 text-[var(--text-muted)]"></i>
+                <p className="text-[var(--text-primary)] font-bold text-lg">No Location Records With Coordinates Available</p>
+                <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-md leading-relaxed">
+                  Ingest evidence files with location entities to automatically geocode and plot them, or ensure coordinate keys are present.
                 </p>
+                <div className="mt-6 p-4 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-xl max-w-sm">
+                  <p className="text-[12px] font-bold text-[var(--warning)] uppercase tracking-wider mb-1">
+                    <i className="fa-solid fa-satellite-dish mr-1"></i> Real-time tracking status
+                  </p>
+                  <p className="text-[11px] text-[var(--warning)]">No live location tracking data is available for this case.</p>
+                </div>
               </div>
             ) : (
-              <div className="absolute inset-0 p-8 flex flex-col">
-                {/* Visual grid backdrop */}
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
+              <div className="absolute inset-0 z-0">
+                <MapContainer 
+                  center={mapCenter} 
+                  zoom={selectedLocation ? 14 : 3} 
+                  scrollWheelZoom={true} 
+                  style={{ height: '100%', width: '100%', background: 'var(--surface-tertiary)' }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                    className="map-tiles"
+                  />
+                  <MapUpdater selectedLocation={selectedLocation} />
+                  {locations.filter(l => l.hasCoords).map((loc) => (
+                    <Marker 
+                      key={loc._id} 
+                      position={[loc.lat, loc.lng]}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedLocation(loc);
+                        },
+                      }}
+                    >
+                      <Popup className="custom-popup">
+                        <div className="flex flex-col gap-3 min-w-[200px]">
+                          <div className="border-b border-gray-200 pb-2">
+                            <h3 className="font-bold text-gray-900 text-base">{loc.name}</h3>
+                            <p className="text-xs text-gray-500 font-mono mt-1">{loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}</p>
+                          </div>
+                          
+                          {loc.associatedEntities && loc.associatedEntities.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Connected Entities</p>
+                              <div className="max-h-24 overflow-y-auto space-y-1">
+                                {loc.associatedEntities.map((ae: any, i: number) => (
+                                  <div key={i} className="text-xs text-gray-700 flex justify-between">
+                                    <span>• {ae.entity.name}</span>
+                                    <span className="text-[9px] bg-gray-100 px-1 rounded text-gray-500">{ae.type}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
-                {/* SVG Coordinate Grid Map */}
-                <div className="flex-1 w-full relative border border-white/5 rounded-xl bg-zinc-950/40 p-4">
-                  <svg className="absolute inset-0 h-full w-full pointer-events-none">
-                    {/* Draw Connection Tracks */}
-                    {locationTracks.map((tr) => {
-                      const fromPos = getCoordinates(tr.from.lat, tr.from.lng);
-                      const toPos = getCoordinates(tr.to.lat, tr.to.lng);
-                      return (
-                        <g key={tr.id}>
-                          <line
-                            x1={fromPos.x}
-                            y1={fromPos.y}
-                            x2={toPos.x}
-                            y2={toPos.y}
-                            stroke="rgba(59, 130, 246, 0.4)"
-                            strokeWidth="1.5"
-                            strokeDasharray="4 3"
-                          />
-                          {/* Animated arrow head indicator */}
-                          <circle
-                            r="3"
-                            fill="#3b82f6"
-                            className="animate-pulse"
-                          >
-                            <animateMotion
-                              path={`M ${fromPos.x} ${fromPos.y} L ${toPos.x} ${toPos.y}`}
-                              dur="3s"
-                              repeatCount="indefinite"
-                            />
-                          </circle>
-                        </g>
-                      );
-                    })}
-                  </svg>
+                          {loc.relatedEvidence && loc.relatedEvidence.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Related Evidence</p>
+                              <div className="max-h-24 overflow-y-auto space-y-1">
+                                {loc.relatedEvidence.map((ev: any, i: number) => (
+                                  <div key={i} className="text-xs text-blue-600 truncate" title={ev.title}>
+                                    <i className="fa-solid fa-file-shield mr-1"></i> {ev.title}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
-                  {/* Render coordinate dots */}
-                  {locations.map((loc) => {
-                    const pos = getCoordinates(loc.lat, loc.lng);
-                    const isSelected = selectedLocation?._id === loc._id;
-                    return (
-                      <button
-                        key={loc._id}
-                        onClick={() => setSelectedLocation(loc)}
-                        className="absolute h-4 w-4 transform -translate-x-1/2 -translate-y-1/2 group"
-                        style={{ left: pos.x, top: pos.y }}
-                      >
-                        {/* Glowing Ring */}
-                        <span className={`absolute inset-0 rounded-full animate-ping opacity-60 ${
-                          isSelected ? "bg-red-500" : "bg-blue-500"
-                        }`} />
-                        {/* Center Dot */}
-                        <span className={`absolute inset-0.5 rounded-full border border-white/20 shadow-lg ${
-                          isSelected ? "bg-red-500" : "bg-blue-500"
-                        }`} />
-                        {/* Tooltip on hover */}
-                        <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 border border-white/10 text-white text-[9px] font-bold rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                          {loc.name}
-                        </span>
-                      </button>
-                    );
-                  })}
+                          {loc.risk_score > 0 && (
+                            <div className="mt-1 pt-2 border-t border-gray-200">
+                              <span className={`text-[10px] font-bold px-2 py-1 rounded ${loc.risk_score > 7 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                                Risk Index: {loc.risk_score}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+
+                {/* Tracking status overlay */}
+                <div className="absolute bottom-4 right-4 z-[400] pointer-events-none">
+                  <div className="px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-lg shadow-lg flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+                    </span>
+                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Static Coordinates Mode</span>
+                  </div>
                 </div>
               </div>
             )}
           </main>
-
         </div>
       )}
     </div>

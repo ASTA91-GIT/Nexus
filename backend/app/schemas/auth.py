@@ -13,6 +13,7 @@ class UserBase(BaseModel):
     clearance_level: str = Field(default="Standard")
     designation: str = Field(default="N/A")
     country: str = Field(default="N/A")
+    avatar: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str

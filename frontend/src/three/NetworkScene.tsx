@@ -1,8 +1,11 @@
 "use client";
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Line, OrbitControls, Text, DragControls } from "@react-three/drei";
+import { Line, OrbitControls, Text, DragControls, Html } from "@react-three/drei";
 import * as THREE from "three";
+
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faUser, faBuilding, faMapMarkerAlt, faCar, faPhone, faFileInvoice, faEnvelope, faCalendarAlt, faExclamationTriangle, faQuestionCircle } from "@fortawesome/free-solid-svg-icons";
 
 function linkEndpointId(value: unknown): string {
   if (value && typeof value === "object") {
@@ -24,6 +27,24 @@ function fibonacciSphere(count: number, radius: number): [number, number, number
   });
 }
 
+const getIconForType = (type: string) => {
+  switch ((type || "").toUpperCase()) {
+    case "PERSON": return faUser;
+    case "ORGANIZATION": return faBuilding;
+    case "LOCATION": return faMapMarkerAlt;
+    case "VEHICLE": return faCar;
+    case "PHONE": 
+    case "PHONE_NUMBER":
+    case "COMMUNICATION": return faPhone;
+    case "ACCOUNT": return faFileInvoice;
+    case "EMAIL": return faEnvelope;
+    case "EVENT": return faCalendarAlt;
+    case "ALERT":
+    case "HIGH_RISK": return faExclamationTriangle;
+    default: return faQuestionCircle;
+  }
+};
+
 function NetworkNode({
   position,
   color,
@@ -35,7 +56,9 @@ function NetworkNode({
   onClick,
   isEditMode,
   onNodeDragEnd,
-  id
+  id,
+  secondaryEntities,
+  avatar
 }: {
   position: [number, number, number];
   color: string;
@@ -48,6 +71,8 @@ function NetworkNode({
   isEditMode?: boolean;
   onNodeDragEnd?: (id: string, x: number, y: number, z: number) => void;
   id: string;
+  secondaryEntities?: any[];
+  avatar?: string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
@@ -90,7 +115,17 @@ function NetworkNode({
       }}
     >
       <mesh ref={meshRef}>
-        <sphereGeometry args={[size, 24, 24]} />
+        {type?.toUpperCase() === "PERSON" ? (
+          <icosahedronGeometry args={[size * 1.2, 2]} />
+        ) : type?.toUpperCase() === "ORGANIZATION" ? (
+          <boxGeometry args={[size * 1.6, size * 1.6, size * 1.6]} />
+        ) : type?.toUpperCase() === "LOCATION" ? (
+          <octahedronGeometry args={[size * 1.4, 0]} />
+        ) : type?.toUpperCase() === "PHONE" || type?.toUpperCase() === "PHONE_NUMBER" ? (
+          <cylinderGeometry args={[size * 0.8, size * 0.8, size * 1.8, 16]} />
+        ) : (
+          <sphereGeometry args={[size, 24, 24]} />
+        )}
         <meshStandardMaterial
           color={color}
           roughness={0.25}
@@ -98,17 +133,36 @@ function NetworkNode({
           emissive={highlighted || isSuspicious ? color : "#000000"}
           emissiveIntensity={highlighted ? 0.85 : hovered ? 0.55 : isSuspicious ? 0.35 : 0.08}
           transparent
-          opacity={opacity}
+          opacity={opacity * 0.8}
         />
       </mesh>
+
+      {/* HTML Billboard for Icon / Avatar */}
+      <Html center style={{ pointerEvents: 'none', zIndex: 100 }} zIndexRange={[100, 0]}>
+        <div 
+          className={`flex items-center justify-center rounded-full overflow-hidden transition-all duration-300 ${dimmed && !hovered ? 'opacity-20' : 'opacity-100'}`}
+          style={{ 
+            width: `${size * 32}px`, 
+            height: `${size * 32}px`,
+            backgroundColor: avatar ? 'transparent' : 'rgba(0,0,0,0.6)',
+            border: highlighted ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.1)'
+          }}
+        >
+          {avatar ? (
+            <img src={avatar} alt={name} className="w-full h-full object-cover" />
+          ) : (
+            <FontAwesomeIcon icon={getIconForType(type)} className="text-white drop-shadow-md" style={{ fontSize: `${size * 14}px`, color: '#ffffff' }} />
+          )}
+        </div>
+      </Html>
+
       {(isSuspicious || highlighted) && (
-        <mesh>
-          <sphereGeometry args={[size * 1.3, 12, 12]} />
+        <mesh rotation-x={Math.PI / 2}>
+          <torusGeometry args={[size * 1.8, 0.05, 16, 100]} />
           <meshBasicMaterial
             color={highlighted ? "#3b82f6" : "#ef4444"}
             transparent
-            opacity={dimmed ? 0.05 : 0.22}
-            wireframe
+            opacity={dimmed ? 0.1 : 0.6}
           />
         </mesh>
       )}
@@ -124,6 +178,43 @@ function NetworkNode({
         >
           {name}
         </Text>
+      )}
+      
+      {hovered && (
+        <Html position={[0, baseSize + 1.2, 0]} center zIndexRange={[200, 100]} style={{ pointerEvents: 'none', zIndex: 200 }}>
+          <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-4 min-w-[240px] text-left shadow-2xl backdrop-blur-md font-sans animate-fade-in pointer-events-none">
+            <div className="flex justify-between items-start mb-2 border-b border-white/5 pb-2">
+              <div className="flex items-center gap-2">
+                {avatar && <img src={avatar} alt="avatar" className="w-8 h-8 rounded bg-zinc-900 object-cover" />}
+                <div>
+                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
+                    <FontAwesomeIcon icon={getIconForType(type)} /> {type}
+                  </span>
+                  <h4 className="text-sm font-bold text-white truncate max-w-[150px]">{name}</h4>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full ${isSuspicious ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                Risk: {riskScore.toFixed(2)}
+              </span>
+            </div>
+            
+            {secondaryEntities && secondaryEntities.length > 0 && (
+              <div className="space-y-1.5 mt-2">
+                <h5 className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Connected Information</h5>
+                <div className="max-h-[140px] overflow-y-auto pr-1 space-y-1 custom-scrollbar pointer-events-auto">
+                  {secondaryEntities.map((ent: any, i: number) => (
+                    <div key={i} className="flex justify-between items-center text-[10px] p-1.5 rounded-md bg-white/[0.02]">
+                      <span className="text-zinc-500 font-bold uppercase w-16 truncate flex items-center gap-1">
+                        <FontAwesomeIcon icon={getIconForType(ent.type)} /> {ent.type}
+                      </span>
+                      <span className="text-zinc-300 font-mono truncate max-w-[100px]" title={ent.name}>{ent.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Html>
       )}
     </group>
   );
@@ -171,6 +262,23 @@ function NetworkEdge({
     () => new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5),
     [start, end]
   );
+  
+  const dir = useMemo(() => {
+    const v = new THREE.Vector3().subVectors(end, start);
+    return v.lengthSq() > 0 ? v.normalize() : new THREE.Vector3(1, 0, 0);
+  }, [start, end]);
+
+  const arrowPos = useMemo(() => {
+    return new THREE.Vector3().copy(end).addScaledVector(dir, -1.35);
+  }, [end, dir]);
+
+  const quaternion = useMemo(() => {
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    q.setFromUnitVectors(up, dir);
+    return q;
+  }, [dir]);
+
   const color = highlighted ? "#60a5fa" : dimmed ? "#334155" : "#94a3b8";
   const opacity = highlighted ? 1 : dimmed ? 0.12 : 0.55;
   const [hovered, setHovered] = useState(false);
@@ -195,6 +303,10 @@ function NetworkEdge({
         transparent
         opacity={opacity}
       />
+      <mesh position={arrowPos} quaternion={quaternion}>
+        <coneGeometry args={[0.2, 0.6, 8]} />
+        <meshBasicMaterial color={hovered ? "#ffffff" : color} transparent opacity={opacity} />
+      </mesh>
       {(!dimmed || highlighted) && (
         <Text
           position={[midPoint.x, midPoint.y + 0.35, midPoint.z]}
@@ -231,23 +343,82 @@ export default function NetworkScene({
 }) {
   const nodes = useMemo(() => {
     const rawNodes = data?.nodes || [];
-    const positions = fibonacciSphere(rawNodes.length, 16);
-    return rawNodes.map((node: any, index: number) => {
-      const idStr = String(node.id ?? node._id ?? index);
-      
-      let pos = positions[index];
+    const rawLinks = data?.links || data?.edges || [];
+    const primaryTypes = new Set(["person", "organization", "location", "vehicle"]);
+
+    const primaryNodes: any[] = [];
+    const secondaryNodes: any[] = [];
+
+    for (const node of rawNodes) {
+      const t = (node.type || "").toLowerCase();
+      if (primaryTypes.has(t)) {
+        primaryNodes.push(node);
+      } else {
+        secondaryNodes.push(node);
+      }
+    }
+
+    const positions = fibonacciSphere(primaryNodes.length, 16);
+    const finalNodes: any[] = [];
+    const primaryMap = new Map<string, any>();
+
+    for (let i = 0; i < primaryNodes.length; i++) {
+      const node = primaryNodes[i];
+      const idStr = String(node.id ?? node._id ?? i);
+      let pos = positions[i] || [0,0,0];
       if (draggedPositions[idStr]) {
         pos = [draggedPositions[idStr].x, draggedPositions[idStr].y, draggedPositions[idStr].z];
       } else if (node.position && typeof node.position.x === 'number') {
         pos = [node.position.x, node.position.y, node.position.z];
       }
-      
-      return {
-        ...node,
-        id: idStr,
-        position: pos,
-      };
-    });
+      const outNode = { ...node, id: idStr, position: pos };
+      primaryMap.set(idStr, outNode);
+      finalNodes.push(outNode);
+    }
+
+    const getConnectedPrimary = (nodeId: string) => {
+      let bestPrimary = null;
+      let maxScore = -1;
+      for (const link of rawLinks) {
+        const s = linkEndpointId(link.source);
+        const t = linkEndpointId(link.target);
+        let potentialPrimary = null;
+        if (s === nodeId && primaryMap.has(t)) potentialPrimary = primaryMap.get(t);
+        if (t === nodeId && primaryMap.has(s)) potentialPrimary = primaryMap.get(s);
+        
+        if (potentialPrimary) {
+          const score = potentialPrimary.risk_score || 0;
+          if (!bestPrimary || score > maxScore) {
+            maxScore = score;
+            bestPrimary = potentialPrimary;
+          }
+        }
+      }
+      return bestPrimary;
+    };
+
+    const secondaryOffsets = new Map<string, number>();
+
+    for (let i = 0; i < secondaryNodes.length; i++) {
+      const node = secondaryNodes[i];
+      const idStr = String(node.id ?? node._id ?? (primaryNodes.length + i));
+      let pos = [0, 0, 0];
+      if (draggedPositions[idStr]) {
+        pos = [draggedPositions[idStr].x, draggedPositions[idStr].y, draggedPositions[idStr].z];
+      } else if (node.position && typeof node.position.x === 'number') {
+        pos = [node.position.x, node.position.y, node.position.z];
+      } else {
+        const parentPrimary = getConnectedPrimary(idStr);
+        if (parentPrimary) {
+           parentPrimary.secondaryEntities = parentPrimary.secondaryEntities || [];
+           parentPrimary.secondaryEntities.push(node);
+        } else {
+           // If unlinked, we can just hide it or still render it since there's no primary to attach to.
+           // Hiding it by NOT pushing to finalNodes is safer to avoid clutter.
+        }
+      }
+    }
+    return finalNodes;
   }, [data, draggedPositions]);
 
   const nodeById = useMemo(() => {
@@ -323,7 +494,7 @@ export default function NetworkScene({
 
   return (
     <div className="h-full w-full min-h-[280px]">
-      <Canvas camera={{ position: [0, 4, 38], fov: 55 }} gl={{ antialias: true }}>
+      <Canvas camera={{ position: [0, 4, 38], fov: 55, near: 0.1, far: 5000 }} gl={{ antialias: true, logarithmicDepthBuffer: true }}>
         <color attach="background" args={["#05070c"]} />
         <ambientLight intensity={0.45} />
         <pointLight position={[40, 40, 40]} intensity={1.1} />
@@ -358,6 +529,8 @@ export default function NetworkScene({
               dimmed={hasHighlight && !isHighlighted}
               isEditMode={isEditMode}
               onNodeDragEnd={onNodeDragEnd}
+              secondaryEntities={node.secondaryEntities}
+              avatar={node.properties?.avatar_url || node.properties?.avatar || node.avatar_url || node.avatar}
             />
           );
         })}

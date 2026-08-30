@@ -18,11 +18,11 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
     
     # 1. OUT_OF_SCOPE
     out_of_scope_patterns = [
-        r"\b(?:weather|sports|celebrity|homework|math|mathematics|stock|stocks|movie|recipe)\b"
+        r"\b(?:weather|sports|celebrity|gossip|homework|math|mathematics|stock|stocks|movie|recipe|coding)\b"
     ]
     if any(re.search(p, query_lower) for p in out_of_scope_patterns):
         return {
-            "answer": "I'm NEXUS AI, an investigation and intelligence assistant. That topic falls outside my area of expertise. I can help you analyze cases, evidence, entities, relationships, network connections, suspicious activity, and investigation data.",
+            "answer": "I’m NEXUS AI, an investigation intelligence assistant. I can help you analyze cases, evidence, entities, relationships, and network connections, but that request is outside my area of expertise.",
             "actions": [],
             "supporting_evidence": []
         }
@@ -36,24 +36,14 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         r"^(what can you do|help(?: me)?|how can you help)$",
         r"^(thanks|thank you)$"
     ]
-    if any(re.match(p, query_clean) for p in conversational_patterns):
-        system_persona = (
-            "System: You are NEXUS, an elite AI forensic analyst and investigator. "
-            "Respond to the user naturally and professionally, explaining your capabilities if asked."
-        )
-        prompt = f"{system_persona}\n{history_context}\nUser: {query}\nAnswer:"
-        answer = call_hf_api(prompt)
-        if not answer:
-            if "can you do" in query_clean or "help" in query_clean:
-                answer = "I can help investigate case data, analyze uploaded evidence, identify entities and relationships, trace network connections, explain risk indicators, and answer questions about your active investigation."
-            else:
-                answer = "Hello! I'm the NEXUS AI Investigator. I can help you explore your investigations, analyze evidence, identify relationships, summarize cases, and answer questions about your investigation data."
-                
-        return {
-            "answer": answer,
-            "actions": [],
-            "supporting_evidence": []
-        }
+    # Do not return immediately for conversational logic if we want AI to handle it, but wait, the instructions said:
+    # "regex may be used only for simple routing such as greetings or obvious out-of-scope"
+    # Wait, the prompt says "The chatbot must return meaningful responses for 'hi', 'who are you', 'what can you do'."
+    # The existing code did handle this, but let's just make it pass through to the LLM or handle it directly.
+    # Actually, the user says "You can naturally respond to greetings and simple conversation such as: hi, hello..."
+    # "Do not use regex as the primary intelligence mechanism for normal case questions. Regex may be used only for simple routing such as greetings or obvious out-of-scope categories. Investigation questions should still reach the AI/RAG pipeline."
+    # Let's remove the regex handling for greetings so the LLM handles it natively, or just keep it simple. Let's remove it and let the LLM handle greetings natively since the new prompt includes it!
+    # Or wait, if we pass greetings to the LLM, it's slower. Let's remove this block and let the LLM handle it, as the system prompt explicitly says "GENERAL CONVERSATION: You can naturally respond to greetings..."
 
     # 3. APP_STATISTICS & CASE_LISTING
     app_stat_patterns = [
@@ -74,9 +64,9 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         if case_names:
             fallback_msg += f" Some of your cases include: {', '.join(case_names)}."
             
-        system_persona = "System: You are NEXUS AI. Answer the user's question regarding their cases based on the facts."
-        prompt = f"{system_persona}\n{history_context}\nFacts: {fallback_msg}\nUser: {query}\nAnswer:"
-        answer = call_hf_api(prompt)
+        system_persona = "You are NEXUS AI, an investigation intelligence assistant. Answer naturally based on the provided facts."
+        user_prompt = f"Facts: {fallback_msg}\n\nQuestion: {query}"
+        answer = call_hf_api(system_persona, user_prompt)
         if not answer:
             answer = fallback_msg
             
@@ -126,9 +116,9 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         
         fallback_msg = f"Your active case is '{case_name}' (Status: {case_status}). {case_desc} This investigation contains {len(entities)} entities and {len(relationships)} relationships."
         
-        system_persona = "System: You are NEXUS AI. Summarize the active case context for the user."
-        prompt = f"{system_persona}\n{history_context}\nFacts: {fallback_msg}\nUser: {query}\nAnswer:"
-        answer = call_hf_api(prompt)
+        system_persona = "You are NEXUS AI, an investigation intelligence assistant. Summarize the active case context for the user."
+        user_prompt = f"Facts: {fallback_msg}\n\nQuestion: {query}"
+        answer = call_hf_api(system_persona, user_prompt)
         if not answer:
             answer = fallback_msg
             
@@ -156,9 +146,9 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         if type_str:
             fallback_msg += f" Entity breakdown: {type_str}."
             
-        system_persona = "System: You are NEXUS AI. Answer the user's statistical query about the case data."
-        prompt = f"{system_persona}\n{history_context}\nFacts: {fallback_msg}\nUser: {query}\nAnswer:"
-        answer = call_hf_api(prompt)
+        system_persona = "You are NEXUS AI, an investigation intelligence assistant. Answer naturally based on facts."
+        user_prompt = f"Facts: {fallback_msg}\n\nQuestion: {query}"
+        answer = call_hf_api(system_persona, user_prompt)
         if not answer:
             answer = fallback_msg
             
@@ -191,7 +181,10 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
     is_follow_up = any(re.search(p, query_lower) for p in pronouns)
     
     # Existing PATH_TRACING
-    path_match = re.search(r"(?:connected to|connection between|link between|path between)\s+([a-zA-Z\s]+)\s+(?:and|to)\s+([a-zA-Z\s\?]+)", query_lower)
+    path_match = re.search(r"(?:connection between|path between|link between|relationship between)\s+([a-zA-Z\s]+)\s+and\s+([a-zA-Z\s\?]+)", query_lower)
+    if not path_match:
+        path_match = re.search(r"(?:how is\s+)?([a-zA-Z\s]+)\s+(?:connected to|related to|linked to)\s+([a-zA-Z\s\?]+)", query_lower)
+        
     if path_match:
         name1 = path_match.group(1).strip().replace("?", "")
         name2 = path_match.group(2).strip().replace("?", "")
@@ -203,12 +196,8 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
             # Maybe it's a follow-up? "who is he connected to?" 
             # If so, it doesn't match this regex cleanly, or it matches name1 = "he". We let it fall through to RAG.
             if not is_follow_up:
-                missing = []
-                if not ent1: missing.append(f"'{name1}'")
-                if not ent2: missing.append(f"'{name2}'")
-                scope_text = "database" if case_id == "all" else "case directory"
                 return {
-                    "answer": f"I couldn't locate {' and '.join(missing)} in the {scope_text}. Please verify suspect names.",
+                    "answer": "There is insufficient evidence in the current case data to establish a relationship.",
                     "actions": [],
                     "supporting_evidence": []
                 }
@@ -234,9 +223,8 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
                 path = find_shortest_path(G, start_id, target_id)
             
             if not path:
-                scope_text = "across cases" if case_id == "all" else "in this case"
                 return {
-                    "answer": f"Analysis complete: No network path was found linking suspect '{ent1['name']}' to '{ent2['name']}' {scope_text}.",
+                    "answer": f"No direct relationship was found between {ent1['name']} and {ent2['name']} in the current case data.",
                     "actions": [],
                     "supporting_evidence": []
                 }
@@ -251,8 +239,9 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
             path_str = " -> ".join(chain)
             grounding_context = f"A path exists between {ent1['name']} and {ent2['name']}: {path_str}."
             
-            prompt = f"System: You are NEXUS Forensic AI. Explain the connection path between the suspects clearly.\n{history_context}\nFact: {grounding_context}\nQuestion: {query}\nAnswer:"
-            answer = call_hf_api(prompt)
+            system_persona = "You are NEXUS AI, an investigation intelligence assistant. Explain the connection path between the suspects clearly."
+            user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
+            answer = call_hf_api(system_persona, user_prompt)
             if not answer:
                 answer = f"The connection path between {ent1['name']} and {ent2['name']} has been traced. They are linked via: {path_str}."
                 
@@ -273,8 +262,9 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
             classification = ent.get("type", "PERSON")
             grounding_context = f"Suspect '{ent['name']}' classified as {classification} has a threat risk index of {risk:.2f}. Attributes: {properties}."
             
-            prompt = f"System: You are NEXUS Forensic AI. Explain why this suspect is marked with risk index {risk:.2f} based strictly on facts.\n{history_context}\nFact: {grounding_context}\nQuestion: {query}\nAnswer:"
-            answer = call_hf_api(prompt)
+            system_persona = "You are NEXUS AI, an investigation intelligence assistant. Explain why this suspect is marked with this risk index based strictly on facts."
+            user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
+            answer = call_hf_api(system_persona, user_prompt)
             if not answer:
                 status_flag = "suspicious attributes" if properties.get("flagged") else "network positions"
                 answer = f"Suspect '{ent['name']}' has a risk score of {risk:.2f} due to {status_flag}. Attributes recorded: {properties}."
@@ -299,8 +289,9 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         list_str = ", ".join([f"'{e['name']}' (Risk: {e['risk_score']:.2f})" for e in high_risk_ents])
         scope_text = "all combined cases" if case_id == "all" else "this case"
         grounding_context = f"High-risk suspects detected in {scope_text}: {list_str}."
-        prompt = f"System: You are NEXUS Forensic AI. Present the list of high threat targets professionally.\n{history_context}\nFact: {grounding_context}\nQuestion: {query}\nAnswer:"
-        answer = call_hf_api(prompt)
+        system_persona = "You are NEXUS AI, an investigation intelligence assistant. Present the list of high threat targets professionally."
+        user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
+        answer = call_hf_api(system_persona, user_prompt)
         if not answer:
             answer = f"The following high-risk suspect profiles require immediate review: {list_str}."
         return {
@@ -363,8 +354,9 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
                     actors.append(f"{source_ent['name']} ({status})")
             actors_str = ", ".join(actors)
             grounding_context = f"Entities who {rel_type.lower()} {target_ent['name']}: {actors_str}."
-            prompt = f"System: You are NEXUS Forensic AI. Report the findings based strictly on the facts.\n{history_context}\nFact: {grounding_context}\nQuestion: {query}\nAnswer:"
-            answer = call_hf_api(prompt)
+            system_persona = "You are NEXUS AI, an investigation intelligence assistant. Report the findings based strictly on the facts."
+            user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
+            answer = call_hf_api(system_persona, user_prompt)
             if not answer:
                 answer = f"The following entities are recorded as having {rel_type.lower()} {target_ent['name']}: {actors_str}."
             action_node = str(relevant_rels[0].get("source_entity_id")) if relevant_rels else target_id_str
@@ -397,21 +389,63 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         evidence_context = "Evidence search unavailable."
     
     # We allow the LLM to process FOLLOW_UP_CONTEXT internally using `history_context` and `evidence_context`.
-    # To improve intelligence, we also inject a list of known entities into the prompt if there are fewer than 20 entities.
-    entity_names = [e["name"] for e in entities[:20]]
+    # To improve intelligence, we also inject a list of known entities and relationships.
+    entity_names = [e["name"] for e in entities[:30]]
     if entity_names:
-        case_summary += f" Known entities include: {', '.join(entity_names)}."
+        case_summary += f"\nKnown entities in this case: {', '.join(entity_names)}."
+        
+    rel_names = []
+    for r in relationships[:20]:
+        s = next((e["name"] for e in entities if str(e["_id"]) == str(r.get("source_entity_id"))), "Unknown")
+        t = next((e["name"] for e in entities if str(e["_id"]) == str(r.get("target_entity_id"))), "Unknown")
+        rel_names.append(f"{s} --[{r.get('type')}]--> {t}")
+    if rel_names:
+        case_summary += f"\nKnown relationships: {'; '.join(rel_names)}."
 
     system_persona = (
-        "System: You are NEXUS, an elite, highly intelligent AI forensic analyst and investigator. "
-        "You analyze case files, suspects, and raw evidence (PDFs, logs). "
-        "Provide professional, sharp, and accurate answers based strictly on the provided facts, evidence, and conversation history. "
-        "You understand follow-up questions referencing previous messages (e.g. 'he', 'they', 'it'). "
-        "Do not hallucinate."
+        "You are NEXUS AI, an intelligent investigation assistant.\n\n"
+        "You assist users with information related to the NEXUS investigation platform and the currently selected investigation case.\n\n"
+        "You may answer questions about:\n"
+        "- uploaded evidence\n"
+        "- extracted entities\n"
+        "- people\n"
+        "- organizations\n"
+        "- locations\n"
+        "- phone numbers\n"
+        "- emails\n"
+        "- accounts\n"
+        "- events\n"
+        "- communications\n"
+        "- relationships between entities\n"
+        "- network connections\n"
+        "- case statistics\n"
+        "- case summaries\n"
+        "- graph structure\n"
+        "- risk information\n"
+        "- path tracing\n"
+        "- investigation findings\n\n"
+        "STRICT GROUNDING RULES:\n"
+        "1. Never invent entities, relationships, evidence, or facts.\n"
+        "2. Base investigation answers only on the provided case context, MongoDB data, graph data, RAG evidence, and conversation history.\n"
+        "3. If the requested information does not exist in the current case, clearly say that the information is not available.\n"
+        "4. Do not pretend to know facts that are not present in the investigation data.\n"
+        "5. Resolve follow-up references such as 'he', 'she', 'they', 'it', 'this person', or 'that organization' using the conversation history.\n"
+        "6. Answer naturally and conversationally, not like a database dump.\n"
+        "7. Keep answers concise unless the user asks for detailed analysis.\n\n"
+        "GENERAL CONVERSATION:\n"
+        "You can naturally respond to greetings and simple conversation such as:\n"
+        "- hi\n"
+        "- hello\n"
+        "- how are you\n"
+        "- who are you\n"
+        "- what can you do\n"
+        "- help\n"
+        "- thank you\n"
     )
     
-    prompt = f"{system_persona}\n\nCase Metrics: {case_summary}\n{history_context}\nEvidence Context: {evidence_context}\n\nQuestion: {query}\nAnswer:"
-    answer = call_hf_api(prompt)
+    user_prompt = f"Case Data:\n{case_summary}\n\nEvidence Context:\n{evidence_context}\n\nConversation History:\n{history_context}\n\nQuestion: {query}"
+    answer = call_hf_api(system_persona, user_prompt)
+    
     if not answer:
         if case_id == "all":
             answer = f"I am connected to the global NEXUS intelligence database. Currently, we have registered {suspects_count} unique suspect profiles and {linkages_count} connections across all investigation files."
@@ -424,22 +458,26 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         "supporting_evidence": ["Consulted vectorized case evidence in ChromaDB."] if "No specific evidence" not in evidence_context else []
     }
 
-def call_hf_api(prompt: str) -> str:
+def call_hf_api(system_prompt: str, user_prompt: str) -> str:
     """
-    Calls Hugging Face Inference Client text generation, handles fallbacks.
+    Calls Hugging Face Inference Client chat completion with the Qwen model.
     """
     client = get_hf_client()
     if not client:
         return ""
         
     try:
-        response = client.text_generation(
-            model="meta-llama/Llama-3-8B-Instruct",
-            prompt=prompt,
-            max_new_tokens=200,
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        response = client.chat_completion(
+            model="Qwen/Qwen2.5-72B-Instruct",
+            messages=messages,
+            max_tokens=400,
             temperature=0.3
         )
-        return response.strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"Hugging Face Client inference failure: {e}")
         return ""

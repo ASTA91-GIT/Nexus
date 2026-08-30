@@ -5,6 +5,7 @@ from app.api.routes.auth import get_current_user
 from app.ingestion.parsers import parse_csv, parse_json, parse_txt, parse_pdf, parse_docx, parse_image
 from app.services.rag_service import index_document
 from datetime import datetime
+import re
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -20,6 +21,7 @@ async def upload_file(
     filename = file.filename.lower()
     
     parsed_data = None
+    is_supported_format = True
     try:
         if filename.endswith(".csv"):
             parsed_data = await parse_csv(contents)
@@ -31,12 +33,14 @@ async def upload_file(
             parsed_data = {"text": await parse_pdf(contents)}
         elif filename.endswith(".docx") or filename.endswith(".doc"):
             parsed_data = {"text": await parse_docx(contents)}
-        elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg"):
+        elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg") or filename.endswith(".webp"):
             parsed_data = {"text": await parse_image(contents)}
         else:
-            raise HTTPException(status_code=400, detail="Unsupported file format")
+            is_supported_format = False
+            parsed_data = {"text": "Binary file or unsupported format. No automated intelligence extraction available."}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
+        is_supported_format = False
+        parsed_data = {"text": f"Failed to parse file: {str(e)}"}
 
     entities_created = 0
     relationships_created = 0
@@ -148,7 +152,7 @@ async def upload_file(
         elif isinstance(parsed_data, str):
             raw_text = parsed_data
             
-        if raw_text:
+        if raw_text and is_supported_format:
             index_document(case_id, str(result.inserted_id), raw_text)
             
             # --- AI EXTRACTION PIPELINE ---
@@ -156,6 +160,11 @@ async def upload_file(
                 from app.ai.entity_extraction import extract_entities_and_relationships
                 ai_results = await extract_entities_and_relationships(raw_text)
                 
+                if "error" in ai_results:
+                    print(f"CRITICAL: AI Extraction returned an error: {ai_results.get('details', ai_results['error'])}")
+                    # Optionally raise error here, but to allow file upload to succeed while warning user:
+                    raise Exception(f"AI Extraction failed: {ai_results.get('details', ai_results['error'])}")
+                    
                 # 1. Insert/Deduplicate Entities
                 entity_name_to_id = {}
                 for ent in ai_results.get("entities", []):
@@ -217,9 +226,19 @@ async def upload_file(
                             }
                             await db["relationships"].insert_one(rel_doc)
                             relationships_created += 1
+            except HTTPException:
+                raise
             except Exception as ai_e:
-                print(f"AI Extraction failed (non-fatal): {ai_e}")
+                import traceback
+                print(f"AI Extraction pipeline failed: {ai_e}")
+                traceback.print_exc()
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"AI Extraction failed at pipeline stage: {str(ai_e)}"
+                )
                 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Failed to index document in ChromaDB: {e}")
     

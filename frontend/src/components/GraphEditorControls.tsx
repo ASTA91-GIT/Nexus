@@ -38,7 +38,7 @@ export default function GraphEditorControls({
   const hasSelection = !!selectedEntity || !!selectedRelationship;
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex gap-4 p-2 bg-[var(--surface-primary)]/90 border border-[var(--border-primary)] rounded-full backdrop-blur-md shadow-2xl">
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-wrap justify-center items-center gap-2 md:gap-4 p-3 bg-[var(--surface-primary)]/90 border border-[var(--border-primary)] rounded-2xl backdrop-blur-md shadow-2xl w-[96%] max-w-3xl overflow-visible">
       <div className="flex bg-[var(--surface-secondary)] rounded-full p-1 border border-[var(--border-primary)]/50">
         <button
           onClick={() => setIsEditMode(false)}
@@ -55,7 +55,7 @@ export default function GraphEditorControls({
       </div>
 
       {isEditMode && (
-        <div className="flex gap-2 items-center pl-2 border-l border-[var(--border-primary)]">
+        <div className="flex flex-wrap justify-center gap-2 items-center md:pl-2 md:border-l border-[var(--border-primary)] w-full sm:w-auto mt-2 sm:mt-0">
           <button onClick={onAddEntity} title="Add Entity" className="w-8 h-8 rounded-full bg-[var(--surface-secondary)] text-[var(--success)] hover:bg-[var(--success)] hover:text-white transition-all shadow border border-[var(--border-primary)]">
             <i className="fa-solid fa-plus"></i>
           </button>
@@ -94,8 +94,8 @@ export default function GraphEditorControls({
           </button>
           
           {unsavedChanges && (
-            <span className="text-[9px] text-[var(--warning)] font-bold uppercase tracking-widest animate-pulse ml-2 absolute -bottom-5 right-4 whitespace-nowrap">
-              Unsaved Layout Changes
+            <span className="text-[9px] text-[var(--warning)] font-bold uppercase tracking-widest animate-pulse ml-2 whitespace-nowrap">
+              Unsaved Changes
             </span>
           )}
         </div>

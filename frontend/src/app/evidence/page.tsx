@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useCase } from "@/context/CaseContext";
 
 export default function EvidencePage() {
@@ -8,28 +8,16 @@ export default function EvidencePage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
-  // Wizard state
-  const [step, setStep] = useState(1); // 1: Upload, 2: Preview & Mappings, 3: Success
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [importType, setImportType] = useState<"ENTITIES" | "RELATIONSHIPS">("ENTITIES");
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   
-  // Mapping columns response from preview
-  const [columns, setColumns] = useState<string[]>([]);
-  const [previewRows, setPreviewRows] = useState<any[]>([]);
-  const [rawData, setRawData] = useState<any[]>([]);
-  const [parsing, setParsing] = useState(false);
-
-  // User configured mappings
-  const [mappings, setMappings] = useState<Record<string, string>>({
-    name: "",
-    type: "",
-    source: "",
-    target: "",
-  });
-
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<any>(null);
-  const [isStructured, setIsStructured] = useState<boolean>(true);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const getApiUrl = (path: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
@@ -63,111 +51,85 @@ export default function EvidencePage() {
     fetchEvidence();
   }, [fetchEvidence]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+  // Audio Recording Logic
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const url = URL.createObjectURL(audioBlob);
+        setAudioBlob(audioBlob);
+        setAudioUrl(url);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setIsPaused(false);
+      setRecordingTime(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Microphone access denied or not available", err);
+      setMessage({ text: "Microphone access denied or not available.", isError: true });
     }
   };
 
-  const handleGeneratePreview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedFile) return;
+  const pauseRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.pause();
+      setIsPaused(true);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  };
 
-    setParsing(true);
-    setMessage(null);
+  const resumeRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
+      mediaRecorderRef.current.resume();
+      setIsPaused(false);
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    }
+  };
 
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+      setIsPaused(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  };
+
+  const discardRecording = () => {
+    setAudioBlob(null);
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    setAudioUrl(null);
+    setRecordingTime(0);
+  };
+
+  const uploadRecording = async () => {
+    if (!activeCaseId || !audioBlob) return;
+    
     const token = localStorage.getItem("token");
     const formData = new FormData();
-    formData.append("file", selectedFile);
-
-    try {
-      const res = await fetch(getApiUrl("/api/ingestion/preview"), {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setColumns(data.columns);
-        setPreviewRows(data.preview);
-        setRawData(data.raw_data);
-        setIsStructured(data.is_structured ?? true);
-        
-        // Auto initialize default mappings if found in columns
-        const newMappings: Record<string, string> = {};
-        if (importType === "ENTITIES") {
-          newMappings.name = data.columns.find((c: string) => c.toLowerCase() === "name" || c.toLowerCase() === "id") || data.columns[0] || "";
-          newMappings.type = data.columns.find((c: string) => c.toLowerCase() === "type" || c.toLowerCase() === "category") || "";
-        } else {
-          newMappings.source = data.columns.find((c: string) => c.toLowerCase() === "source" || c.toLowerCase() === "from") || data.columns[0] || "";
-          newMappings.target = data.columns.find((c: string) => c.toLowerCase() === "target" || c.toLowerCase() === "to") || data.columns[1] || "";
-          newMappings.type = data.columns.find((c: string) => c.toLowerCase() === "type" || c.toLowerCase() === "relation") || "";
-        }
-        setMappings(newMappings);
-        setStep(2);
-      } else {
-        const err = await res.json();
-        setMessage({ text: err.detail || "Failed to parse file preview.", isError: true });
-      }
-    } catch (err) {
-      console.error(err);
-      setMessage({ text: "Error connecting to parser service.", isError: true });
-    } finally {
-      setParsing(false);
-    }
-  };
-
-  const handleExecuteImport = async () => {
-    if (!activeCaseId) return;
-    setImporting(true);
-    setMessage(null);
-
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(getApiUrl("/api/ingestion/import-mapped"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          case_id: activeCaseId,
-          import_type: importType,
-          data: rawData,
-          mappings: mappings,
-          filename: selectedFile?.name || "import_data.csv"
-        })
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        setImportResult(result);
-        setStep(3);
-        fetchEvidence();
-      } else {
-        const err = await res.json();
-        setMessage({ text: err.detail || "Import failed.", isError: true });
-      }
-    } catch (err) {
-      console.error(err);
-      setMessage({ text: "Network connection error executing import.", isError: true });
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const handleUnstructuredImport = async () => {
-    if (!activeCaseId || !selectedFile) return;
-    setImporting(true);
-    setMessage(null);
-
-    const token = localStorage.getItem("token");
-    const formData = new FormData();
-    formData.append("file", selectedFile);
+    const file = new File([audioBlob], `recording_${Date.now()}.webm`, { type: "audio/webm" });
+    formData.append("file", file);
     formData.append("case_id", activeCaseId);
 
     try {
+      setMessage(null);
       const res = await fetch(getApiUrl("/api/ingestion/upload"), {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -175,347 +137,269 @@ export default function EvidencePage() {
       });
 
       if (res.ok) {
-        const result = await res.json();
-        setImportResult(result);
-        setStep(3);
+        setMessage({ text: "Audio recording uploaded successfully to case evidence.", isError: false });
+        discardRecording();
         fetchEvidence();
       } else {
         const err = await res.json();
-        setMessage({ text: err.detail || "Upload failed.", isError: true });
+        setMessage({ text: err.detail || "Failed to upload recording.", isError: true });
       }
     } catch (err) {
       console.error(err);
-      setMessage({ text: "Network connection error executing upload.", isError: true });
-    } finally {
-      setImporting(false);
+      setMessage({ text: "Network error uploading recording.", isError: true });
     }
   };
 
-  const handleResetWizard = () => {
-    setSelectedFile(null);
-    setColumns([]);
-    setPreviewRows([]);
-    setRawData([]);
-    setStep(1);
-    setImportResult(null);
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
   };
 
   return (
-    <div className="flex flex-col gap-8 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col gap-8 max-w-7xl mx-auto w-full pb-20">
       {/* Header */}
-      <div className="border-b border-white/5 pb-5">
-        <h1 className="text-2xl font-extrabold tracking-tight">Evidence Explorer & Ingestion</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Upload phone records, call detail registries, transaction charts, or location lists. Custom map them dynamically.
+      <div className="border-b border-[var(--border-primary)] pb-5">
+        <h1 className="text-2xl font-extrabold tracking-tight text-[var(--text-primary)]">Evidence Intelligence Workspace</h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
+          Ingest, map, and organize forensic evidence. Create live audio intercepts or upload file records.
         </p>
       </div>
 
-      {/* Main Grid split: Left is Import Wizard, Right is Registry list */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        
-        {/* Left Side: Dynamic Data Import Wizard */}
-        <div className="xl:col-span-1 flex flex-col gap-6">
-          <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-2xl">
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
-              <i className="fa-solid fa-bolt text-yellow-500"></i> Data Ingestion Wizard
-            </h2>
+      {message && (
+        <div className={`p-4 rounded-xl border text-sm flex justify-between items-center shadow-sm ${
+          message.isError ? "bg-[var(--danger)]/10 border-[var(--danger)]/20 text-[var(--danger)]" : "bg-[var(--success)]/10 border-[var(--success)]/20 text-[var(--success)]"
+        }`}>
+          <span className="font-medium">{message.text}</span>
+          <button onClick={() => setMessage(null)} className="text-xs font-bold hover:opacity-80">Close</button>
+        </div>
+      )}
+
+      {!activeCaseId ? (
+        <div className="p-16 border border-dashed border-[var(--border-primary)] rounded-2xl text-center text-[var(--text-muted)] bg-[var(--surface-secondary)]">
+          <i className="fa-solid fa-folder-open text-4xl mb-3 opacity-50"></i>
+          <p>Please select an active Case File from the sidebar to interact with evidence intelligence.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          
+          {/* Left Side: Upload & Audio */}
+          <div className="xl:col-span-1 flex flex-col gap-6">
             
-            {message && (
-              <div className="mb-4 p-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-xs flex justify-between">
-                <span>{message.text}</span>
-                <button onClick={() => setMessage(null)} className="font-bold">X</button>
-              </div>
-            )}
+            {/* Primary: File Upload */}
+            <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] p-6 rounded-2xl shadow-sm">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-[var(--text-primary)]">
+                <i className="fa-solid fa-cloud-arrow-up text-[var(--accent-primary)]"></i> Upload Evidence
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mb-6">
+                Upload documents, images, audio, video, and other investigation files to this case.
+              </p>
 
-            {!activeCaseId ? (
-              <div className="p-8 text-center text-zinc-600 text-xs italic bg-zinc-950/40 rounded-xl">
-                Please select or create an active Case File first to ingest evidence records.
-              </div>
-            ) : (
-              <>
-                {/* Wizard Steps Indicators */}
-                <div className="flex justify-between items-center mb-6 text-[10px] font-bold text-zinc-500 font-mono">
-                  <span className={step >= 1 ? "text-blue-500" : ""}>1. UPLOAD</span>
-                  <span>&rarr;</span>
-                  <span className={step >= 2 ? "text-blue-500" : ""}>2. MAP FIELDS</span>
-                  <span>&rarr;</span>
-                  <span className={step >= 3 ? "text-blue-500" : ""}>3. PROCESS</span>
+              <label className="flex flex-col items-center justify-center p-8 bg-[var(--surface-secondary)] border-2 border-dashed border-[var(--border-secondary)] hover:border-[var(--accent-primary)] rounded-xl mb-4 transition-colors cursor-pointer group">
+                <i className="fa-solid fa-file-arrow-up text-4xl text-[var(--text-muted)] group-hover:text-[var(--accent-primary)] mb-4 transition-colors"></i>
+                <span className="text-sm font-bold text-[var(--text-primary)] mb-1">Click to browse or drag files here</span>
+                <span className="text-xs text-[var(--text-secondary)] text-center">
+                  Supports PDF, DOCX, TXT, CSV, JSON, JPG, PNG, WEBP, MP3, MP4, etc.
+                </span>
+                <input 
+                  type="file" 
+                  multiple 
+                  className="hidden" 
+                  onChange={async (e) => {
+                    const files = e.target.files;
+                    if (!files || files.length === 0 || !activeCaseId) return;
+                    
+                    const token = localStorage.getItem("token");
+                    let hasError = false;
+
+                    setMessage({ text: `Uploading ${files.length} file(s)...`, isError: false });
+
+                    for (let i = 0; i < files.length; i++) {
+                      const formData = new FormData();
+                      formData.append("file", files[i]);
+                      formData.append("case_id", activeCaseId);
+                      
+                      try {
+                        const res = await fetch(getApiUrl("/api/ingestion/upload"), {
+                          method: "POST",
+                          headers: { Authorization: `Bearer ${token}` },
+                          body: formData
+                        });
+                        if (!res.ok) hasError = true;
+                      } catch (err) {
+                        hasError = true;
+                      }
+                    }
+
+                    if (hasError) {
+                      setMessage({ text: "Some files failed to upload. Check console for details.", isError: true });
+                    } else {
+                      setMessage({ text: "All files uploaded successfully.", isError: false });
+                    }
+                    fetchEvidence();
+                    // Clear input
+                    e.target.value = "";
+                  }} 
+                />
+              </label>
+            </div>
+
+            {/* Secondary: Audio Recorder */}
+            <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] p-6 rounded-2xl shadow-sm">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-[var(--text-primary)]">
+                <i className="fa-solid fa-microphone text-[var(--danger)]"></i> Record Audio (Optional)
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mb-6">
+                Capture live audio intercepts directly into the case.
+              </p>
+
+              <div className="flex flex-col items-center justify-center p-4 bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-xl mb-4 shadow-inner gap-2">
+                <div className={`text-3xl font-mono font-bold tracking-widest ${isRecording ? 'text-[var(--danger)]' : 'text-[var(--text-primary)]'}`}>
+                  {formatTime(recordingTime)}
                 </div>
-
-                {/* STEP 1: Upload File */}
-                {step === 1 && (
-                  <form onSubmit={handleGeneratePreview} className="space-y-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Import Category</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setImportType("ENTITIES")}
-                          className={`p-3 rounded-xl border font-semibold text-xs transition-all ${
-                            importType === "ENTITIES" 
-                              ? "bg-blue-600/10 border-blue-500/30 text-blue-400 font-extrabold" 
-                              : "bg-zinc-950 border-white/5 text-zinc-400 hover:text-white"
-                          }`}
-                        >
-                          <i className="fa-solid fa-users"></i> Entity Directory
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setImportType("RELATIONSHIPS")}
-                          className={`p-3 rounded-xl border font-semibold text-xs transition-all ${
-                            importType === "RELATIONSHIPS" 
-                              ? "bg-blue-600/10 border-blue-500/30 text-blue-400 font-extrabold" 
-                              : "bg-zinc-950 border-white/5 text-zinc-400 hover:text-white"
-                          }`}
-                        >
-                          <i className="fa-solid fa-link"></i> Relationship Links
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Forensic File (CSV, JSON, PDF, TXT)</label>
-                      <input 
-                        type="file" 
-                        accept=".csv,.json,.pdf,.txt"
-                        onChange={handleFileChange}
-                        className="w-full text-zinc-400 text-xs bg-zinc-950/60 p-3 rounded-xl border border-white/10 file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-blue-600/15 file:text-blue-400 cursor-pointer"
-                        required
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={parsing || !selectedFile}
-                      className="w-full p-3 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
-                    >
-                      {parsing ? "Parsing File..." : "Analyze Columns & Preview"}
-                    </button>
-                  </form>
+                {isRecording && (
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--danger)] animate-pulse uppercase">
+                    <div className="w-2 h-2 rounded-full bg-[var(--danger)]"></div>
+                    {isPaused ? "PAUSED" : "RECORDING"}
+                  </div>
                 )}
+              </div>
 
-                {/* STEP 2: Configure Mappings & Preview */}
-                {step === 2 && (
-                  <div className="space-y-5">
-                    <div className="p-3 bg-zinc-950 border border-white/5 rounded-xl space-y-2 text-xs">
-                      <p className="text-zinc-500">File Selected: <span className="text-zinc-300 font-mono font-semibold">{selectedFile?.name}</span></p>
-                      <p className="text-zinc-500">Total Rows Detected: <span className="text-zinc-300 font-mono font-semibold">{rawData.length}</span></p>
-                    </div>
-
-                    {/* Mapping Selectors (Only for structured data) */}
-                    {isStructured ? (
-                      <div className="space-y-3">
-                        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Map Columns to Schema</h3>
-                        
-                        {importType === "ENTITIES" ? (
-                          <>
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Entity Name column (Required)</label>
-                              <select
-                                value={mappings.name}
-                                onChange={(e) => setMappings({ ...mappings, name: e.target.value })}
-                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                                required
-                              >
-                                <option value="">-- Select Column --</option>
-                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                              </select>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Classification/Type column (Optional)</label>
-                              <select
-                                value={mappings.type}
-                                onChange={(e) => setMappings({ ...mappings, type: e.target.value })}
-                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                              >
-                                <option value="">-- Default (PERSON) --</option>
-                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                              </select>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Source Entity (From) (Required)</label>
-                              <select
-                                value={mappings.source}
-                                onChange={(e) => setMappings({ ...mappings, source: e.target.value })}
-                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                                required
-                              >
-                                <option value="">-- Select Column --</option>
-                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                              </select>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Target Entity (To) (Required)</label>
-                              <select
-                                value={mappings.target}
-                                onChange={(e) => setMappings({ ...mappings, target: e.target.value })}
-                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                                required
-                              >
-                                <option value="">-- Select Column --</option>
-                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                              </select>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Relationship Type (Optional)</label>
-                              <select
-                                value={mappings.type}
-                                onChange={(e) => setMappings({ ...mappings, type: e.target.value })}
-                                className="p-2.5 rounded-xl bg-zinc-950 border border-white/10 text-xs text-zinc-300 focus:outline-none"
-                              >
-                                <option value="">-- Default (CONNECTED_TO) --</option>
-                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-                              </select>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider"><i className="fa-solid fa-file-lines mr-1"></i> Document Extraction Ready</h3>
-                        <p className="text-xs text-zinc-400">This document will be analyzed, its text extracted, and stored for AI Retrieval Augmented Generation (RAG).</p>
-                      </div>
-                    )}
-
-                    {/* Preview Table / Text */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Sample Preview</label>
-                      <div className="overflow-x-auto border border-white/5 rounded-xl bg-zinc-950/40 text-[10px]">
-                        {isStructured ? (
-                          <table className="w-full text-left text-zinc-400">
-                            <thead>
-                              <tr className="border-b border-white/5 bg-zinc-900/40 font-mono text-[9px]">
-                                {columns.slice(0, 3).map((col) => <th key={col} className="p-2">{col}</th>)}
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5 font-mono">
-                              {previewRows.slice(0, 3).map((row, idx) => (
-                                <tr key={idx}>
-                                  {columns.slice(0, 3).map((col) => <td key={col} className="p-2 truncate max-w-[100px]">{String(row[col])}</td>)}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        ) : (
-                          <div className="p-4 whitespace-pre-wrap text-zinc-400 font-mono leading-relaxed h-32 overflow-y-auto">
-                            {previewRows[0]?.text || "No text extracted..."}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                      {isStructured ? (
-                        <button
-                          onClick={handleExecuteImport}
-                          disabled={importing || (importType === "ENTITIES" ? !mappings.name : (!mappings.source || !mappings.target))}
-                          className="flex-1 p-3 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
+              {audioUrl ? (
+                <div className="flex flex-col gap-3">
+                  <audio src={audioUrl} controls className="w-full h-8" />
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={uploadRecording}
+                      className="flex-1 p-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white rounded-lg font-bold text-xs transition-all shadow-sm flex items-center justify-center gap-2"
+                    >
+                      <i className="fa-solid fa-cloud-arrow-up"></i> Upload
+                    </button>
+                    <button 
+                      onClick={discardRecording}
+                      className="px-3 py-2 bg-[var(--surface-tertiary)] hover:bg-[var(--surface-hover)] border border-[var(--border-primary)] text-[var(--danger)] rounded-lg font-bold text-xs transition-colors shadow-sm"
+                      title="Discard"
+                    >
+                      <i className="fa-solid fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {!isRecording ? (
+                    <button 
+                      onClick={startRecording}
+                      className="col-span-3 p-3 bg-[var(--danger)] hover:bg-red-700 text-white rounded-lg font-bold text-sm transition-all shadow-sm flex items-center justify-center gap-2"
+                    >
+                      <i className="fa-solid fa-circle text-xs"></i> Start
+                    </button>
+                  ) : (
+                    <>
+                      {isPaused ? (
+                        <button 
+                          onClick={resumeRecording}
+                          className="col-span-2 p-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white rounded-lg font-bold text-xs transition-all shadow-sm flex items-center justify-center gap-2"
                         >
-                          {importing ? "Importing Records..." : "Execute Import"}
+                          <i className="fa-solid fa-play"></i> Resume
                         </button>
                       ) : (
-                        <button
-                          onClick={handleUnstructuredImport}
-                          disabled={importing}
-                          className="flex-1 p-3 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
+                        <button 
+                          onClick={pauseRecording}
+                          className="col-span-2 p-2 bg-[var(--warning)] hover:bg-yellow-600 text-white rounded-lg font-bold text-xs transition-all shadow-sm flex items-center justify-center gap-2"
                         >
-                          {importing ? "Processing Document..." : "Ingest Document for AI"}
+                          <i className="fa-solid fa-pause"></i> Pause
                         </button>
                       )}
-                      <button
-                        onClick={handleResetWizard}
-                        className="px-4 py-3 bg-zinc-900 hover:bg-zinc-800 border border-white/10 rounded-xl font-bold text-xs text-zinc-400"
+                      
+                      <button 
+                        onClick={stopRecording}
+                        className="col-span-1 p-2 bg-[var(--surface-tertiary)] border border-[var(--border-primary)] hover:border-[var(--danger)] text-[var(--danger)] rounded-lg font-bold text-xs transition-colors shadow-sm flex items-center justify-center gap-2"
                       >
-                        Cancel
+                        <i className="fa-solid fa-square"></i> Stop
                       </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* STEP 3: Complete Success Status */}
-                {step === 3 && (
-                  <div className="text-center py-6 space-y-4">
-                    <i className="fa-solid fa-circle-check text-4xl text-green-500"></i>
-                    <h3 className="text-base font-extrabold text-white">Import Complete!</h3>
-                    <p className="text-xs text-zinc-500 leading-relaxed px-4">
-                      {importResult?.message || "Data processed successfully."}
-                    </p>
-                    <div className="p-3 bg-zinc-950 border border-white/5 rounded-xl text-left space-y-1.5 max-w-xs mx-auto text-xs font-mono text-zinc-400">
-                      <div className="flex justify-between"><span>New Entities:</span> <span className="font-bold text-white">{importResult?.entities_created}</span></div>
-                      <div className="flex justify-between"><span>New Relationships:</span> <span className="font-bold text-white">{importResult?.relationships_created}</span></div>
-                    </div>
-                    <button
-                      onClick={handleResetWizard}
-                      className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-white/10 rounded-xl font-bold text-xs text-white"
-                    >
-                      Import Another Dataset
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Right Side: Evidence Registry Explorer */}
-        <div className="xl:col-span-2 flex flex-col gap-6">
-          <div className="bg-zinc-900/20 border border-white/5 p-6 rounded-2xl">
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-300">
-              <i className="fa-solid fa-clipboard-list text-blue-500"></i> Case Evidence Registry
-            </h2>
+          {/* Right Side: Evidence Registry */}
+          <div className="xl:col-span-2 flex flex-col gap-6">
+            <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] p-6 rounded-2xl shadow-sm">
+              <div className="flex justify-between items-center mb-6 border-b border-[var(--border-primary)] pb-4">
+                <div>
+                  <h2 className="text-lg font-bold flex items-center gap-2 text-[var(--text-primary)]">
+                    <i className="fa-solid fa-clipboard-list text-[var(--accent-primary)]"></i> Case Evidence Registry
+                  </h2>
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">
+                    Viewing intelligence for: <strong className="text-[var(--text-primary)]">{activeCase?.name}</strong>
+                  </p>
+                </div>
+              </div>
 
-            {!activeCaseId ? (
-              <div className="p-16 border border-dashed border-white/5 rounded-xl text-center text-zinc-600">
-                Please select a Case File from the sidebar to inspect evidence registries.
-              </div>
-            ) : loading ? (
-              <div className="p-16 flex flex-col items-center justify-center gap-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                <span className="text-xs text-zinc-500">Retrieving case files registry...</span>
-              </div>
-            ) : evidenceList.length === 0 ? (
-              <div className="p-16 border border-dashed border-white/5 rounded-xl text-center text-zinc-600">
-                No evidence registries recorded for this case. Use the Import Wizard on the left to ingest records.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-sm text-zinc-400">
-                  <thead>
-                    <tr className="border-b border-white/5 text-zinc-500 text-xs font-semibold uppercase tracking-wider">
-                      <th className="py-3 px-4">Filename</th>
-                      <th className="py-3 px-4">Category</th>
-                      <th className="py-3 px-4">Registrar</th>
-                      <th className="py-3 px-4">Date Ingested</th>
-                      <th className="py-3 px-4">Evidence ID</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {evidenceList.map((ev) => (
-                      <tr key={ev._id} className="hover:bg-white/[0.01] transition-colors">
-                        <td className="py-3.5 px-4 font-bold text-white text-base">{ev.title}</td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-1 text-xs rounded-full bg-zinc-900 border border-white/10 text-zinc-400 font-mono">
-                            {ev.source_type}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-xs text-zinc-400">{ev.created_by}</td>
-                        <td className="py-3.5 px-4 text-xs text-zinc-500">
-                          {new Date(ev.created_at).toLocaleString()}
-                        </td>
-                        <td className="py-3.5 px-4 text-xs font-mono text-zinc-600">{ev._id}</td>
+              {loading ? (
+                <div className="p-16 flex flex-col items-center justify-center gap-3 bg-[var(--surface-secondary)] rounded-xl border border-[var(--border-primary)]">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[var(--accent-primary)]"></div>
+                  <span className="text-xs text-[var(--text-secondary)]">Retrieving case registries...</span>
+                </div>
+              ) : evidenceList.length === 0 ? (
+                <div className="p-16 border border-dashed border-[var(--border-primary)] rounded-xl text-center text-[var(--text-muted)] bg-[var(--surface-secondary)]">
+                  <i className="fa-solid fa-file-shield text-3xl mb-3 opacity-50"></i>
+                  <p>No evidence registries recorded for this case. Upload files or record audio to begin.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-[var(--border-primary)] bg-[var(--surface-secondary)]">
+                  <table className="w-full border-collapse text-left text-sm text-[var(--text-primary)]">
+                    <thead>
+                      <tr className="border-b border-[var(--border-primary)] bg-[var(--surface-tertiary)] text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4">Filename</th>
+                        <th className="py-3 px-4">Category</th>
+                        <th className="py-3 px-4">Registrar</th>
+                        <th className="py-3 px-4">Date Ingested</th>
+                        <th className="py-3 px-4">ID</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-primary)]">
+                      {evidenceList.map((ev) => (
+                        <tr key={ev._id} className="hover:bg-[var(--surface-hover)] transition-colors bg-[var(--surface-primary)]">
+                          <td className="py-3.5 px-4 font-bold text-[var(--text-primary)]">
+                            <span className="flex items-center gap-2">
+                              {ev.source_type === "WEBM" ? (
+                                <i className="fa-solid fa-file-audio text-[var(--danger)]"></i>
+                              ) : (
+                                <i className="fa-solid fa-file text-[var(--accent-primary)]"></i>
+                              )}
+                              <span className="truncate max-w-[200px]" title={ev.title}>{ev.title}</span>
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded bg-[var(--surface-tertiary)] border border-[var(--border-primary)] text-[var(--text-secondary)]">
+                              {ev.source_type}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-[var(--text-secondary)] font-medium">
+                            <span className="truncate max-w-[120px] inline-block" title={ev.created_by}>{ev.created_by}</span>
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-[var(--text-secondary)]">
+                            {new Date(ev.created_at).toLocaleString(undefined, {
+                              year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                            })}
+                          </td>
+                          <td className="py-3.5 px-4 text-[10px] font-mono text-[var(--text-muted)]">
+                            {ev._id.substring(0, 8)}...
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-      </div>
+        </div>
+      )}
     </div>
   );
 }

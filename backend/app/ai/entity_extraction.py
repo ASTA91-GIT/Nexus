@@ -25,24 +25,24 @@ Instructions:
 4. Do not include markdown formatting, explanations, or any other text outside the JSON object.
 
 JSON Format:
-{
+{{
   "entities": [
-    {
+    {{
       "name": "Entity Name",
       "type": "ENTITY_TYPE",
       "description": "Brief description based on text",
       "risk_score": 0.5
-    }
+    }}
   ],
   "relationships": [
-    {
+    {{
       "source": "Source Entity Name",
       "target": "Target Entity Name",
       "type": "RELATIONSHIP_TYPE",
       "description": "Brief description of connection"
-    }
+    }}
   ]
-}
+}}
 
 Text to analyze:
 {text}
@@ -65,8 +65,8 @@ async def extract_entities_and_relationships(text: str) -> Dict[str, Any]:
     try:
         response = hf_client.chat_completion(
             messages=messages,
-            model="meta-llama/Llama-3.2-3B-Instruct",
-            max_tokens=1500,
+            model="Qwen/Qwen2.5-72B-Instruct",
+            max_tokens=4000,
             temperature=0.1
         )
         
@@ -96,11 +96,13 @@ async def extract_entities_and_relationships(text: str) -> Dict[str, Any]:
         }
         
     except json.JSONDecodeError as e:
-        print(f"JSON Parse Error in extraction: {e}. Raw reply: {reply[:200]}")
-        return {"error": "Failed to parse JSON from AI", "entities": [], "relationships": [], "raw": reply}
+        error_msg = f"JSON Parse Error in extraction: {e}. Raw reply: {reply[:500]}"
+        print(error_msg)
+        return {"error": "Failed to parse JSON from AI", "entities": [], "relationships": [], "raw": reply, "details": error_msg}
     except Exception as e:
-        print(f"AI Extraction Error: {e}")
-        return {"error": str(e), "entities": [], "relationships": []}
+        error_msg = f"AI Extraction API Error: {str(e)}"
+        print(error_msg)
+        return {"error": str(e), "entities": [], "relationships": [], "details": error_msg}
 
 # For backward compatibility if anything else calls the old function
 async def extract_entities(text: str) -> List[Dict]:

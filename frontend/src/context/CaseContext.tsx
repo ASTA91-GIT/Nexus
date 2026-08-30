@@ -16,7 +16,12 @@ const CaseContext = createContext<CaseContextType | undefined>(undefined);
 
 export function CaseProvider({ children }: { children: React.ReactNode }) {
   const [cases, setCases] = useState<any[]>([]);
-  const [activeCaseId, setActiveCaseId] = useState<string>("");
+  const [activeCaseId, setActiveCaseId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("activeCaseId") || "";
+    }
+    return "";
+  });
   const [activeCase, setActiveCase] = useState<any>(null);
   const [loadingCases, setLoadingCases] = useState(true);
   const router = useRouter();
@@ -49,13 +54,20 @@ export function CaseProvider({ children }: { children: React.ReactNode }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setCases(data);
-        if (data.length > 0) {
+        const normalizedData = data.map((c: any) => ({ ...c, _id: c._id || c.id }));
+        setCases(normalizedData);
+        
+        if (normalizedData.length > 0) {
           const storedCaseId = localStorage.getItem("activeCaseId");
-          const found = data.find((c: any) => c._id === storedCaseId);
-          const currentId = found ? found._id : data[0]._id;
-          setActiveCaseId(currentId);
-          localStorage.setItem("activeCaseId", currentId);
+          const found = normalizedData.find((c: any) => c._id === storedCaseId);
+          
+          if (found) {
+            setActiveCaseId(found._id);
+            localStorage.setItem("activeCaseId", found._id);
+          } else {
+            setActiveCaseId(normalizedData[0]._id);
+            localStorage.setItem("activeCaseId", normalizedData[0]._id);
+          }
         } else {
           setActiveCaseId("");
           setActiveCase(null);
@@ -73,9 +85,11 @@ export function CaseProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch active case details when activeCaseId changes
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchActiveCase = async () => {
       if (!activeCaseId) {
-        setActiveCase(null);
+        if (isMounted) setActiveCase(null);
         return;
       }
       const token = localStorage.getItem("token");
@@ -85,7 +99,7 @@ export function CaseProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch(getApiUrl(`/api/cases/${activeCaseId}`), {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (res.ok) {
+        if (res.ok && isMounted) {
           const data = await res.json();
           setActiveCase(data);
         }
@@ -94,7 +108,12 @@ export function CaseProvider({ children }: { children: React.ReactNode }) {
       }
     };
     fetchActiveCase();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [activeCaseId]);
+
 
   useEffect(() => {
     if (pathname !== "/login" && pathname !== "/") {

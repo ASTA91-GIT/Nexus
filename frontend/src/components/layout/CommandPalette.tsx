@@ -44,7 +44,6 @@ export default function CommandPalette() {
       items: [
         { name: "Command Center", icon: "🏢", path: "/dashboard" },
         { name: "Investigation Workspace", icon: "🔍", path: "/investigate" },
-        { name: "Global Link Map", icon: "🕸️", path: "/global-network" },
         { name: "NEXUS AI", icon: "🧠", path: "/ai-history" },
         { name: "Risk Dashboard", icon: "⚠️", path: "/risk" },
         { name: "Alerts Center", icon: "🚨", path: "/alerts" },

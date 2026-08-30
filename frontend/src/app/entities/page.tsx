@@ -75,6 +75,7 @@ export default function EntitiesPage() {
             return {
               ...rel,
               targetName: targetEntity ? targetEntity.name : `Entity ID: ${targetId.slice(0, 8)}...`,
+              targetType: targetEntity ? targetEntity.type : "UNKNOWN",
               direction: isSource ? "Outgoing" : "Incoming"
             };
           });
@@ -94,7 +95,10 @@ export default function EntitiesPage() {
     const matchSearch = ent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         JSON.stringify(ent.properties || {}).toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchType = typeFilter === "ALL" || ent.type === typeFilter;
+    const primaryTypes = ["PERSON", "ORGANIZATION", "LOCATION", "VEHICLE"];
+    const matchType = typeFilter === "ALL" 
+      ? primaryTypes.includes(ent.type)
+      : ent.type === typeFilter;
     
     let matchRisk = true;
     if (riskFilter === "HIGH") matchRisk = ent.risk_score > 0.7;
@@ -284,39 +288,74 @@ export default function EntitiesPage() {
           </div>
 
           {/* Links / Connections Section */}
-          <div className="space-y-3 flex-1 flex flex-col overflow-hidden min-h-[200px]">
-            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Direct Network Links ({profileRelationships.length})</h3>
-            
+          <div className="space-y-4 flex-1 flex flex-col overflow-hidden min-h-[200px]">
             {loadingProfile ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2">
                 <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500"></div>
                 <span className="text-[10px] text-zinc-500 font-mono">Loading relationships...</span>
               </div>
-            ) : profileRelationships.length === 0 ? (
-              <p className="text-zinc-600 text-xs italic flex-1 flex items-center justify-center">No connections mapped.</p>
             ) : (
-              <div className="flex-1 overflow-y-auto pr-1 space-y-2.5">
-                {profileRelationships.map((rel, idx) => (
-                  <div key={idx} className="p-3.5 rounded-xl bg-zinc-950/60 border border-white/5 text-xs flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-zinc-300 truncate max-w-[180px]">{rel.targetName}</span>
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-600/10 text-blue-400 font-semibold">
-                        {rel.type}
-                      </span>
-                    </div>
-                    {Object.keys(rel.properties || {}).length > 0 && (
-                      <div className="text-[10px] text-zinc-500 font-mono border-t border-white/5 pt-2">
-                        {Object.entries(rel.properties).map(([k, v]) => (
-                          <div key={k} className="flex justify-between">
-                            <span>{k}:</span>
-                            <span className="text-zinc-400">{String(v)}</span>
+              <>
+                {(() => {
+                  const primaryTypes = ["PERSON", "ORGANIZATION", "LOCATION", "VEHICLE"];
+                  const primaryLinks = profileRelationships.filter(rel => primaryTypes.includes(rel.targetType));
+                  const secondaryInfo = profileRelationships.filter(rel => !primaryTypes.includes(rel.targetType));
+                  
+                  return (
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-5">
+                      
+                      {/* Direct Network Links (Primary) */}
+                      <div className="space-y-3">
+                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Direct Network Links ({primaryLinks.length})</h3>
+                        {primaryLinks.length === 0 ? (
+                          <p className="text-zinc-600 text-xs italic flex-1 flex items-center justify-center">No primary connections mapped.</p>
+                        ) : (
+                          <div className="space-y-2.5">
+                            {primaryLinks.map((rel, idx) => (
+                              <div key={`prim-${idx}`} className="p-3.5 rounded-xl bg-zinc-950/60 border border-white/5 text-xs flex flex-col gap-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-bold text-zinc-300 truncate max-w-[180px]">{rel.targetName}</span>
+                                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-600/10 text-blue-400 font-semibold">
+                                    {rel.type}
+                                  </span>
+                                </div>
+                                {Object.keys(rel.properties || {}).length > 0 && (
+                                  <div className="text-[10px] text-zinc-500 font-mono border-t border-white/5 pt-2">
+                                    {Object.entries(rel.properties).map(([k, v]) => (
+                                      <div key={k} className="flex justify-between">
+                                        <span>{k}:</span>
+                                        <span className="text-zinc-400">{String(v)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+
+                      {/* Supporting Information (Secondary) */}
+                      <div className="space-y-3">
+                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Supporting Information ({secondaryInfo.length})</h3>
+                        {secondaryInfo.length === 0 ? (
+                          <p className="text-zinc-600 text-xs italic flex-1 flex items-center justify-center">No supporting info extracted.</p>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            {secondaryInfo.map((rel, idx) => (
+                              <div key={`sec-${idx}`} className="p-2.5 rounded-lg bg-zinc-900/40 border border-white/5 text-xs flex flex-col justify-center">
+                                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 truncate">{rel.targetType}</span>
+                                <span className="font-mono text-zinc-300 break-all">{rel.targetName}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  );
+                })()}
+              </>
             )}
           </div>
         </aside>

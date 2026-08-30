@@ -18,8 +18,8 @@ export function ConfirmDeleteModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 w-[400px] shadow-2xl flex flex-col gap-4">
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-md overflow-y-auto">
+      <div className="relative z-[9999] bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 w-[400px] shadow-2xl flex flex-col gap-4 m-auto">
         <h2 className="text-lg font-bold text-[var(--danger)] uppercase tracking-wider flex items-center gap-2">
           <i className="fa-solid fa-triangle-exclamation"></i> {title}
         </h2>
@@ -78,8 +78,8 @@ export function EntityModal({
   const isAiExtracted = entity?.source === "AI_EXTRACTED";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 w-[500px] shadow-2xl flex flex-col gap-4">
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-md overflow-y-auto py-10">
+      <div className="relative z-[9999] bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 w-[500px] shadow-2xl flex flex-col gap-4 m-auto">
         <h2 className="text-lg font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-2">
           {entity ? <i className="fa-solid fa-pen"></i> : <i className="fa-solid fa-plus"></i>}
           {entity ? "Edit Entity" : "Add Entity"}
@@ -199,8 +199,8 @@ export function RelationshipModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 w-[500px] shadow-2xl flex flex-col gap-4">
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-md overflow-y-auto py-10">
+      <div className="relative z-[9999] bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 w-[500px] shadow-2xl flex flex-col gap-4 m-auto">
         <h2 className="text-lg font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-2">
           {relationship ? <i className="fa-solid fa-pen"></i> : <i className="fa-solid fa-link"></i>}
           {relationship ? "Edit Relationship" : "Add Relationship"}

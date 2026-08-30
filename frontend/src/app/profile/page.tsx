@@ -89,26 +89,85 @@ export default function ProfilePage() {
     setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const savedAvatar = localStorage.getItem("user_avatar");
+    if (savedAvatar) {
+      setAvatarDataUrl(savedAvatar);
+    }
+  }, []);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Optimistic local preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setAvatarDataUrl(dataUrl);
+      localStorage.setItem("user_avatar", dataUrl); // Fallback caching
+      // Dispatch event for TopBar to update
+      window.dispatchEvent(new Event("avatar-updated"));
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to backend
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const res = await fetch(getApiUrl("/api/auth/profile/avatar"), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.avatar_url) {
+          setAvatarDataUrl(data.avatar_url);
+          localStorage.setItem("user_avatar", data.avatar_url);
+          window.dispatchEvent(new Event("avatar-updated"));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to upload avatar", err);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto w-full flex flex-col gap-8 pb-12">
       
       {/* HEADER SECTION */}
       <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl overflow-hidden shadow-lg">
-        <div className="h-32 bg-gradient-to-r from-[var(--primary-accent)] to-purple-600 relative">
+        <div className="h-32 bg-gradient-to-r from-[var(--accent-primary)] to-purple-600 relative">
           <div className="absolute inset-0 bg-black/20" />
         </div>
         <div className="px-8 pb-8 flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-12 relative z-10">
-          <div className="w-24 h-24 rounded-2xl bg-[var(--surface-primary)] p-1.5 shadow-xl">
-            <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--primary-accent)] to-purple-600 flex items-center justify-center text-white font-black text-3xl uppercase">
-              {userProfile?.email ? userProfile.email.substring(0, 2) : "AD"}
+          
+          <label className="w-24 h-24 rounded-2xl bg-[var(--surface-primary)] p-1.5 shadow-xl cursor-pointer group relative overflow-hidden shrink-0 block">
+            <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+            {avatarDataUrl ? (
+              <img src={avatarDataUrl} alt="Avatar" className="w-full h-full object-cover rounded-xl" />
+            ) : (
+              <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--accent-primary)] to-purple-600 flex items-center justify-center text-white font-black text-3xl uppercase">
+                {userProfile?.email ? userProfile.email.substring(0, 2) : "AD"}
+              </div>
+            )}
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl transition-opacity">
+              <i className="fa-solid fa-camera text-white"></i>
             </div>
-          </div>
+          </label>
+          
           <div className="flex-1 space-y-1">
             <h1 className="text-3xl font-black text-[var(--text-primary)] capitalize">
               {userProfile?.role === "ADMIN" ? "Admin Investigator" : "Investigator"}
             </h1>
             <p className="text-sm text-[var(--text-secondary)] font-medium">{userProfile?.email || "admin@nexus-intel.local"}</p>
-            <div className="flex gap-4 mt-2 text-[11px] font-mono font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
+            <div className="flex gap-4 mt-2 text-[11px] font-mono font-bold text-[var(--text-muted)] uppercase tracking-wider">
               <span>Role: {userProfile?.role || "Global Admin"}</span>
               <span>Status: <span className="text-[var(--success)]">Active</span></span>
               <span>Joined: {userProfile?.created_at ? new Date(userProfile.created_at).toLocaleDateString() : "Just now"}</span>
@@ -130,8 +189,8 @@ export default function ProfilePage() {
             onClick={() => setActiveTab(tab)}
             className={`px-6 py-3 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${
               activeTab === tab 
-                ? "border-[var(--primary-accent)] text-[var(--primary-accent)] bg-[var(--primary-accent)]/5" 
-                : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                ? "border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--accent-primary)]/5" 
+                : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
             {tab}
@@ -144,23 +203,23 @@ export default function ProfilePage() {
         {activeTab === "OVERVIEW" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm">
-              <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Cases Created</span>
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Cases Created</span>
               <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.cases_created}</p>
             </div>
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm">
-              <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Cases Assigned</span>
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Cases Assigned</span>
               <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.cases_assigned}</p>
             </div>
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm">
-              <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Evidence Uploaded</span>
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Evidence Uploaded</span>
               <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.evidence_uploaded}</p>
             </div>
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm">
-              <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Reports Generated</span>
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Reports Generated</span>
               <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.reports_generated}</p>
             </div>
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm col-span-1 sm:col-span-2">
-              <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">AI Investigation Queries</span>
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">AI Investigation Queries</span>
               <p className="text-4xl font-black mt-2 text-[var(--text-primary)]">{stats.ai_queries}</p>
             </div>
           </div>
@@ -174,7 +233,7 @@ export default function ProfilePage() {
             {loadingLogs ? (
               <div className="p-12 text-center text-[var(--text-secondary)]">Loading secure logs...</div>
             ) : logs.length === 0 ? (
-              <div className="p-12 text-center text-[var(--text-tertiary)] italic">No activity recorded.</div>
+              <div className="p-12 text-center text-[var(--text-muted)] italic">No activity recorded.</div>
             ) : (
               <div className="divide-y divide-[var(--border-primary)] max-h-[600px] overflow-y-auto">
                 {logs.map(log => (
@@ -183,7 +242,7 @@ export default function ProfilePage() {
                       <p className="text-sm font-semibold text-[var(--text-primary)]">{log.action}</p>
                       <p className="text-xs text-[var(--text-secondary)] mt-1">{log.resource}</p>
                     </div>
-                    <span className="text-[10px] text-[var(--text-tertiary)] font-mono">{new Date(log.timestamp).toLocaleString()}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] font-mono">{new Date(log.timestamp).toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -197,21 +256,21 @@ export default function ProfilePage() {
               <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-4">Update Password</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Current Password</label>
-                  <input type="password" placeholder="••••••••" className="w-full mt-1 bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm rounded-lg p-2.5 focus:outline-none focus:border-[var(--primary-accent)]" />
+                  <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Current Password</label>
+                  <input type="password" placeholder="••••••••" className="w-full mt-1 bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm rounded-lg p-2.5 focus:outline-none focus:border-[var(--accent-primary)]" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">New Password</label>
-                  <input type="password" placeholder="••••••••" className="w-full mt-1 bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm rounded-lg p-2.5 focus:outline-none focus:border-[var(--primary-accent)]" />
+                  <label className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">New Password</label>
+                  <input type="password" placeholder="••••••••" className="w-full mt-1 bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm rounded-lg p-2.5 focus:outline-none focus:border-[var(--accent-primary)]" />
                 </div>
-                <button className="px-4 py-2 bg-[var(--primary-accent)] text-white text-sm font-bold rounded-lg shadow hover:bg-[var(--primary-hover)] transition-colors">
+                <button className="px-4 py-2 bg-[var(--accent-primary)] text-white text-sm font-bold rounded-lg shadow hover:bg-[var(--accent-secondary)] transition-colors">
                   Update Security Credentials
                 </button>
               </div>
             </div>
             <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-6 shadow-sm">
               <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-4">Active Sessions</h3>
-              <div className="p-4 border border-[var(--primary-accent)]/30 bg-[var(--primary-accent)]/5 rounded-lg flex justify-between items-center">
+              <div className="p-4 border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 rounded-lg flex justify-between items-center">
                 <div>
                   <p className="text-sm font-bold text-[var(--text-primary)]">Current Session (Windows 11)</p>
                   <p className="text-xs text-[var(--text-secondary)]">IP: 192.168.1.144</p>
@@ -239,7 +298,7 @@ export default function ProfilePage() {
                         key={t}
                         onClick={() => setTheme(t)}
                         className={`px-4 py-1.5 text-xs font-bold rounded-md capitalize transition-colors ${
-                          theme === t ? "bg-[var(--surface-primary)] text-[var(--primary-accent)] shadow-sm" : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                          theme === t ? "bg-[var(--surface-primary)] text-[var(--accent-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                         }`}
                       >
                         {t}

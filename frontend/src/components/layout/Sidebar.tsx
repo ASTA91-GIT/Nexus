@@ -15,11 +15,10 @@ const navGroups = [
   {
     title: "Case Intelligence",
     items: [
-      { name: "Cases", path: "/cases", icon: <i className="fa-solid fa-folder-open"></i> },
+      { name: "Upload Case Files", path: "/cases", icon: <i className="fa-solid fa-folder-open"></i> },
       { name: "Entities", path: "/entities", icon: <i className="fa-solid fa-users"></i> },
       { name: "3D Link Map", path: "/network", icon: <i className="fa-solid fa-diagram-project"></i> },
-      { name: "Global Link Map", path: "/global-network", icon: <i className="fa-solid fa-globe"></i> },
-      { name: "Evidence Explorer", path: "/evidence", icon: <i className="fa-solid fa-file-shield"></i> },
+      { name: "Evidence Intelligence", path: "/evidence", icon: <i className="fa-solid fa-file-shield"></i> },
       { name: "Timeline", path: "/timeline", icon: <i className="fa-solid fa-timeline"></i> },
       { name: "Geographic Intel", path: "/locations", icon: <i className="fa-solid fa-location-dot"></i> },
     ]
@@ -27,7 +26,6 @@ const navGroups = [
   {
     title: "Analysis",
     items: [
-      { name: "Analytics", path: "/analytics", icon: <i className="fa-solid fa-chart-line"></i> },
       { name: "Risk Analysis", path: "/risk", icon: <i className="fa-solid fa-triangle-exclamation"></i> },
       { name: "Anomalies", path: "/anomalies", icon: <i className="fa-solid fa-bolt"></i> },
       { name: "Alert Center", path: "/alerts", icon: <i className="fa-solid fa-bell"></i> },
@@ -91,7 +89,7 @@ export default function Sidebar() {
       </button>
 
       <div className="p-6 border-b border-[var(--border-primary)] flex items-center gap-3 overflow-hidden">
-        <div className="h-8 w-8 rounded-lg bg-[var(--primary-accent)] flex items-center justify-center font-bold text-base text-white shrink-0">
+        <div className="h-8 w-8 rounded-lg bg-[var(--accent-primary)] flex items-center justify-center font-bold text-base text-white shrink-0">
           N
         </div>
         {!collapsed && (
@@ -103,7 +101,7 @@ export default function Sidebar() {
 
       <div className="p-4 border-b border-[var(--border-primary)] overflow-hidden">
         {!collapsed && (
-          <label className="block text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+          <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">
             Active Case File
           </label>
         )}
@@ -113,7 +111,7 @@ export default function Sidebar() {
           <select 
             value={activeCaseId} 
             onChange={(e) => setActiveCaseId(e.target.value)}
-            className={`w-full p-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-secondary)] text-xs focus:outline-none focus:border-[var(--primary-accent)] ${
+            className={`w-full p-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-secondary)] text-xs focus:outline-none focus:border-[var(--accent-primary)] ${
               collapsed ? "text-center px-1" : ""
             }`}
           >
@@ -132,7 +130,7 @@ export default function Sidebar() {
           return (
           <div key={idx} className="space-y-1">
             {!collapsed && (
-              <h3 className="px-3.5 mb-2 text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
+              <h3 className="px-3.5 mb-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
                 {group.title}
               </h3>
             )}
@@ -145,7 +143,7 @@ export default function Sidebar() {
                   href={item.path}
                   className={`flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all group relative ${
                     isActive 
-                      ? "bg-[var(--primary-accent)] text-white shadow-md shadow-[var(--primary-accent)]/20" 
+                      ? "bg-[var(--accent-primary)] text-white shadow-md shadow-[var(--accent-primary)]/20" 
                       : "text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] border border-transparent"
                   }`}
                 >

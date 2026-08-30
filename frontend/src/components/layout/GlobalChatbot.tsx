@@ -1,6 +1,7 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useCase } from "@/context/CaseContext";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   sender: "user" | "ai";
@@ -17,6 +18,7 @@ export default function GlobalChatbot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
+  const [caseEntities, setCaseEntities] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const getApiUrl = (path: string) => {
@@ -33,14 +35,30 @@ export default function GlobalChatbot() {
     }
   }, [messages, isOpen]);
 
-  // Sync scope selection with case context
+  // Sync scope selection with case context and load entities
   useEffect(() => {
     if (activeCaseId) {
       setScope("active");
+      const token = localStorage.getItem("token");
+      fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => res.json()).then(data => {
+        if (Array.isArray(data)) setCaseEntities(data);
+      }).catch(e => console.error(e));
     } else {
       setScope("all");
+      setCaseEntities([]);
     }
   }, [activeCaseId]);
+
+  // Derived suggested questions based on case entities
+  const dynamicSuggestions = useMemo(() => {
+    return [
+      { text: "Identify the highest-risk entities in this case and explain the factors contributing to their risk scores.", icon: "🔍" },
+      { text: "Trace the shortest known relationship path between two selected entities using the available case intelligence.", icon: "🔗" },
+      { text: "Highlight missing evidence or intelligence gaps that should be prioritized for further investigation.", icon: "⚠️" }
+    ];
+  }, []);
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
@@ -181,18 +199,15 @@ export default function GlobalChatbot() {
                 
                 {/* Suggestions Grid */}
                 <div className="w-full space-y-1.5 mt-2">
-                  <button 
-                    onClick={() => handleSuggest("Who are the high risk entities?")}
-                    className="w-full text-left p-2 rounded-lg border border-white/5 hover:border-white/10 bg-zinc-900/40 text-[9px] text-zinc-400 hover:text-zinc-200 transition-all font-semibold cursor-pointer truncate"
-                  >
-                    🔍 "Who are the high risk entities?"
-                  </button>
-                  <button 
-                    onClick={() => handleSuggest("how is John Doe connected to Alice Smith?")}
-                    className="w-full text-left p-2 rounded-lg border border-white/5 hover:border-white/10 bg-zinc-900/40 text-[9px] text-zinc-400 hover:text-zinc-200 transition-all font-semibold cursor-pointer truncate"
-                  >
-                    🔗 "How is John Doe connected to Alice Smith?"
-                  </button>
+                  {dynamicSuggestions.map((sug, idx) => (
+                    <button 
+                      key={idx}
+                      onClick={() => handleSuggest(sug.text)}
+                      className="w-full text-left p-2 rounded-lg border border-white/5 hover:border-white/10 bg-zinc-900/40 text-[9px] text-zinc-400 hover:text-zinc-200 transition-all font-semibold cursor-pointer truncate"
+                    >
+                      {sug.icon} "{sug.text}"
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : (
@@ -210,9 +225,13 @@ export default function GlobalChatbot() {
                   <div className={`p-3 rounded-xl text-[11px] border leading-relaxed ${
                     msg.sender === "user" 
                       ? "bg-blue-600/10 border-blue-500/20 text-white rounded-tr-none" 
-                      : "bg-zinc-900 border-white/5 text-zinc-300 rounded-tl-none shadow-md"
+                      : "bg-zinc-900 border-white/5 text-zinc-300 rounded-tl-none shadow-md overflow-hidden"
                   }`}>
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                    {msg.sender === "ai" ? (
+                      <ReactMarkdown className="prose prose-invert prose-sm max-w-none text-[11px] prose-p:leading-relaxed prose-headings:text-white prose-a:text-blue-400 marker:text-zinc-500 prose-ul:my-1 prose-li:my-0">{msg.text}</ReactMarkdown>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                    )}
 
                     {msg.evidence && msg.evidence.length > 0 && (
                       <div className="mt-2.5 pt-2.5 border-t border-white/5 text-[8px] font-mono text-zinc-500 space-y-0.5">

@@ -20,9 +20,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (loadingCases) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[var(--background)] text-[var(--text-primary)] font-mono text-sm tracking-widest uppercase">
+      <div className="flex h-screen items-center justify-center bg-[var(--app-background)] text-[var(--text-primary)] font-mono text-sm tracking-widest uppercase">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-6 w-6 rounded-full border-2 border-t-[var(--primary-accent)] border-[var(--border-primary)] animate-spin" />
+          <div className="h-6 w-6 rounded-full border-2 border-t-[var(--accent-primary)] border-[var(--border-primary)] animate-spin" />
           <span>Securing Core Context...</span>
         </div>
       </div>
@@ -30,18 +30,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen w-screen bg-[var(--background)] text-[var(--text-primary)] overflow-hidden font-sans relative">
+    <div className="flex h-screen w-screen bg-[var(--app-background)] text-[var(--text-primary)] overflow-hidden font-sans relative">
       <CommandPalette />
       
       {/* Dynamic Collapsible Sidebar */}
-      <Sidebar />
+      <div className="print:hidden h-full flex flex-col z-20 relative"><Sidebar /></div>
 
       {/* Main Content Area */}
       <main className="flex-1 h-full overflow-hidden relative flex flex-col">
         {/* Glow Ambient background */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[var(--primary-accent)] opacity-5 rounded-full blur-3xl pointer-events-none z-0" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[var(--accent-primary)] opacity-5 rounded-full blur-3xl pointer-events-none z-0" />
         
-        <TopBar />
+        <div className="print:hidden z-20 relative"><TopBar /></div>
 
         {/* Layout content wrapper */}
         <div className="flex-1 overflow-y-auto p-8 z-10 relative">
@@ -49,7 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Persistent Floating Chatbot */}
-        <GlobalChatbot />
+        <div className="print:hidden"><GlobalChatbot /></div>
       </main>
     </div>
   );

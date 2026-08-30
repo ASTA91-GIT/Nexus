@@ -35,7 +35,7 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
       </head>
-      <body suppressHydrationWarning className="min-h-full bg-background text-foreground transition-colors duration-300 antialiased font-sans">
+      <body suppressHydrationWarning className="min-h-full bg-[var(--app-background)] text-[var(--text-primary)] transition-colors duration-300 antialiased font-sans">
         <ThemeProvider>
           <CaseProvider>
             <AppShell>
