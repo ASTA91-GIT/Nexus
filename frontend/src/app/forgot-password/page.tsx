@@ -14,7 +14,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-slate-200 flex flex-col items-center justify-center p-6 relative overflow-y-auto font-sans">
+    <div className="min-h-screen bg-[var(--app-background)] text-slate-200 flex flex-col items-center justify-center p-6 relative overflow-y-auto font-sans">
       
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -66,7 +66,7 @@ export default function ForgotPassword() {
                     placeholder="agent@nexus-intel.gov" 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-3.5 pl-11 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-slate-200 placeholder-slate-600 transition-all" 
+                    className="w-full p-3.5 pl-11 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-slate-200 placeholder-slate-600 transition-all" 
                     required 
                   />
                 </div>

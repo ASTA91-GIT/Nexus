@@ -159,7 +159,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-slate-200 flex flex-col items-center justify-center p-6 relative overflow-y-auto font-sans">
+    <div className="min-h-screen bg-[var(--app-background)] text-slate-200 flex flex-col items-center justify-center p-6 relative overflow-y-auto font-sans">
       
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -253,7 +253,7 @@ export default function Login() {
                     maxLength={6}
                     value={mfaCode} 
                     onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
-                    className="w-full p-3.5 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-2xl text-center text-slate-200 tracking-widest font-mono" 
+                    className="w-full p-3.5 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-2xl text-center text-slate-200 tracking-widest font-mono" 
                     placeholder="000000" 
                     required 
                   />
@@ -272,7 +272,7 @@ export default function Login() {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Full Name</label>
                       <div className="relative">
                         <i className="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                        <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="John Doe" required />
+                        <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="John Doe" required />
                       </div>
                     </div>
 
@@ -280,7 +280,7 @@ export default function Login() {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Email Address</label>
                       <div className="relative">
                         <i className="fa-solid fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="agent@nexus-intel.gov" required />
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="agent@nexus-intel.gov" required />
                       </div>
                     </div>
 
@@ -288,7 +288,7 @@ export default function Login() {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Phone Number</label>
                       <div className="relative">
                         <i className="fa-solid fa-phone absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                        <input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="+1 (555) 000-0000" required />
+                        <input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="+1 (555) 000-0000" required />
                       </div>
                     </div>
                   </div>
@@ -303,7 +303,7 @@ export default function Login() {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Organization / Department</label>
                       <div className="relative">
                         <i className="fa-solid fa-sitemap absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                        <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="Cyber Intelligence Division" required />
+                        <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="Cyber Intelligence Division" required />
                       </div>
                     </div>
 
@@ -311,7 +311,7 @@ export default function Login() {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Investigator / Employee ID</label>
                       <div className="relative">
                         <i className="fa-solid fa-id-badge absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                        <input type="text" value={badgeNumber} onChange={(e) => setBadgeNumber(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="INV-9824A" required />
+                        <input type="text" value={badgeNumber} onChange={(e) => setBadgeNumber(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="INV-9824A" required />
                       </div>
                     </div>
 
@@ -320,14 +320,14 @@ export default function Login() {
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Role</label>
                         <div className="relative">
                           <i className="fa-solid fa-user-tag absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                          <input type="text" value={designation} onChange={(e) => setDesignation(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="Analyst" required />
+                          <input type="text" value={designation} onChange={(e) => setDesignation(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="Analyst" required />
                         </div>
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Region</label>
                         <div className="relative">
                           <i className="fa-solid fa-globe absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                          <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="EU / US" />
+                          <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className="w-full p-2.5 pl-10 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all" placeholder="EU / US" />
                         </div>
                       </div>
                     </div>
@@ -345,7 +345,7 @@ export default function Login() {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Password</label>
                       <div className="relative">
                         <i className="fa-solid fa-key absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                        <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-2.5 pl-10 pr-10 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all font-mono tracking-widest" placeholder="••••••••" required />
+                        <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-2.5 pl-10 pr-10 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all font-mono tracking-widest" placeholder="••••••••" required />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
                           <i className={`fa-solid ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
                         </button>
@@ -384,7 +384,7 @@ export default function Login() {
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Confirm Password</label>
                       <div className="relative">
                         <i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                        <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-2.5 pl-10 pr-10 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all font-mono tracking-widest" placeholder="••••••••" required />
+                        <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-2.5 pl-10 pr-10 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 text-xs text-slate-200 placeholder-slate-600 transition-all font-mono tracking-widest" placeholder="••••••••" required />
                         <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
                           <i className={`fa-solid ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
                         </button>
@@ -411,7 +411,7 @@ export default function Login() {
                       placeholder="agent@nexus-intel.gov" 
                       value={email} 
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full p-3.5 pl-11 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-slate-200 placeholder-slate-600 transition-all" 
+                      className="w-full p-3.5 pl-11 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-slate-200 placeholder-slate-600 transition-all" 
                       required 
                     />
                   </div>
@@ -426,7 +426,7 @@ export default function Login() {
                       placeholder="••••••••••••" 
                       value={password} 
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full p-3.5 pl-11 rounded-lg bg-[var(--background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-slate-200 placeholder-slate-600 transition-all font-mono tracking-widest" 
+                      className="w-full p-3.5 pl-11 rounded-lg bg-[var(--app-background)] border border-[var(--border)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm text-slate-200 placeholder-slate-600 transition-all font-mono tracking-widest" 
                       required 
                     />
                   </div>

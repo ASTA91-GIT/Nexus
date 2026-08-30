@@ -68,7 +68,7 @@ export default function Dashboard() {
   }, [fetchCommandCenterData]);
 
   return (
-    <div className="relative w-full h-[calc(100vh-4rem)] bg-[var(--background)] overflow-hidden">
+    <div className="relative w-full h-[calc(100vh-4rem)] bg-[var(--app-background)] overflow-hidden">
       
       {/* BACKGROUND 3D GRAPH (CENTERPIECE) */}
       <div className="absolute inset-0 z-0">

@@ -393,7 +393,7 @@ export default function InvestigatePage() {
   }, [relationships, entities]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] w-full gap-4 relative overflow-hidden bg-[var(--background)]">
+    <div className="flex flex-col h-[calc(100vh-4rem)] w-full gap-4 relative overflow-hidden bg-[var(--app-background)]">
       
       {/* Upper Area */}
       <div className="flex-1 flex gap-4 min-h-0 overflow-hidden px-4 pt-4">
@@ -676,7 +676,7 @@ export default function InvestigatePage() {
                             <div className="flex items-center gap-3 bg-[var(--surface-secondary)] p-2 rounded-lg border border-[var(--border-primary)]">
                               <span className="h-2 w-2 rounded-full bg-[var(--primary-accent)] shadow-[0_0_8px_var(--primary-accent)]" />
                               <span className="font-bold text-[var(--text-primary)]">{node.name}</span>
-                              <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--background)] px-1.5 py-0.5 rounded">({node.type})</span>
+                              <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--app-background)] px-1.5 py-0.5 rounded">({node.type})</span>
                             </div>
                             {!isLast && rel && (
                               <div className="pl-5 py-1 flex items-center gap-2 text-[10px] text-[var(--primary-accent)]">
