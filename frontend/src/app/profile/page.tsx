@@ -150,7 +150,7 @@ export default function ProfilePage() {
           
           <label className="w-24 h-24 rounded-2xl bg-[var(--surface-primary)] p-1.5 shadow-xl cursor-pointer group relative overflow-hidden shrink-0 block">
             <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-            {avatarDataUrl ? (
+            {avatarDataUrl && avatarDataUrl !== "null" && avatarDataUrl !== "undefined" ? (
               <img src={avatarDataUrl} alt="Avatar" className="w-full h-full object-cover rounded-xl" />
             ) : (
               <div className="w-full h-full rounded-xl bg-gradient-to-br from-[var(--accent-primary)] to-purple-600 flex items-center justify-center text-white font-black text-3xl uppercase">

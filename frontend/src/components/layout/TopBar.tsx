@@ -125,7 +125,7 @@ export default function TopBar() {
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
             <div className="w-8 h-8 rounded bg-[var(--accent-primary)] flex items-center justify-center text-white font-bold text-sm shadow-sm ring-2 ring-[var(--app-background)] outline outline-1 outline-[var(--border-primary)] overflow-hidden">
-              {avatarDataUrl ? (
+              {avatarDataUrl && avatarDataUrl !== "null" && avatarDataUrl !== "undefined" ? (
                 <img src={avatarDataUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
                 <i className="fa-solid fa-user"></i>

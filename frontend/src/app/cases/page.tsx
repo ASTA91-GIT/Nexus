@@ -163,9 +163,10 @@ export default function CasesPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("case_id", activeCaseId);
+      formData.append("title", file.name);
 
       try {
-        const res = await fetch(getApiUrl("/api/ingestion/upload"), {
+        const res = await fetch(getApiUrl("/api/evidence/upload"), {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`

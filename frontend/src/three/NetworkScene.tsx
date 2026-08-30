@@ -160,7 +160,7 @@ function NetworkNode({
             border: highlighted ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.1)'
           }}
         >
-          {avatar && !imgError ? (
+          {avatar && avatar !== "null" && avatar !== "undefined" && !imgError ? (
             <img src={avatar} alt={name} className="w-full h-full object-cover" onError={() => setImgError(true)} />
           ) : (
             <FontAwesomeIcon icon={getIconForType(type)} className="text-white drop-shadow-md" style={{ fontSize: `${size * 14}px`, color: '#ffffff' }} />
@@ -197,7 +197,7 @@ function NetworkNode({
           <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl p-4 min-w-[240px] text-left shadow-2xl backdrop-blur-md font-sans animate-fade-in pointer-events-none">
             <div className="flex justify-between items-start mb-2 border-b border-white/5 pb-2">
               <div className="flex items-center gap-2">
-                {avatar && <img src={avatar} alt="avatar" className="w-8 h-8 rounded bg-zinc-900 object-cover" />}
+                {avatar && avatar !== "null" && avatar !== "undefined" && <img src={avatar} alt="avatar" className="w-8 h-8 rounded bg-zinc-900 object-cover" />}
                 <div>
                   <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
                     <FontAwesomeIcon icon={getIconForType(type)} /> {type}

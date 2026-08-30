@@ -127,10 +127,11 @@ export default function EvidencePage() {
     const file = new File([audioBlob], `recording_${Date.now()}.webm`, { type: "audio/webm" });
     formData.append("file", file);
     formData.append("case_id", activeCaseId);
+    formData.append("title", file.name);
 
     try {
       setMessage(null);
-      const res = await fetch(getApiUrl("/api/ingestion/upload"), {
+      const res = await fetch(getApiUrl("/api/evidence/upload"), {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -218,9 +219,10 @@ export default function EvidencePage() {
                       const formData = new FormData();
                       formData.append("file", files[i]);
                       formData.append("case_id", activeCaseId);
+                      formData.append("title", files[i].name);
                       
                       try {
-                        const res = await fetch(getApiUrl("/api/ingestion/upload"), {
+                        const res = await fetch(getApiUrl("/api/evidence/upload"), {
                           method: "POST",
                           headers: { Authorization: `Bearer ${token}` },
                           body: formData
