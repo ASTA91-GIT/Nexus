@@ -391,3 +391,83 @@ body {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
   transform: translateY(-1px);
 }
+
+/* Global Typography Hierarchy applied globally */
+
+h1, .page-title {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+h2, h3, .section-heading {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card-title, h4 {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 600;
+}
+
+body, p, span, div, .body-text, td, th {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+button, .btn-primary, .btn-secondary, .btn-neutral {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 600;
+  letter-spacing: normal;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.metadata-label, .table-header, th {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em; /* Subtle, not excessive */
+}
+
+/* Restrict Monospace font */
+.mono, code, pre, .id-hash, .timestamp {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+td {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+}
+
+.entity-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Specific component typography rules to override any random monospace */
+.sidebar-nav-item, .top-nav, .filter-tab {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+.sidebar-nav-item.active {
+  font-weight: 700;
+}
+

@@ -3,6 +3,7 @@ from typing import List
 from app.schemas.case import CaseCreate, CaseOut
 from app.core.database import get_database
 from app.api.routes.auth import get_current_user
+from app.api.dependencies import verify_case_access
 from bson import ObjectId
 
 from datetime import datetime
@@ -30,14 +31,7 @@ async def list_cases(db=Depends(get_database), current_user=Depends(get_current_
     return cases
 
 @router.get("/{case_id}", response_model=CaseOut)
-async def get_case(case_id: str, db=Depends(get_database), current_user=Depends(get_current_user)):
-    try:
-        case = await db["cases"].find_one({"_id": ObjectId(case_id)})
-    except:
-        raise HTTPException(status_code=400, detail="Invalid Case ID format")
-    
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+async def get_case(case_id: str, case=Depends(verify_case_access)):
     return case
 
 @router.put("/{case_id}", response_model=CaseOut)
@@ -61,16 +55,8 @@ async def update_case(case_id: str, updated_case: CaseCreate, db=Depends(get_dat
     return refreshed_case
 
 @router.delete("/{case_id}")
-async def delete_case(case_id: str, db=Depends(get_database), current_user=Depends(get_current_user)):
-    try:
-        oid = ObjectId(case_id)
-    except:
-        raise HTTPException(status_code=400, detail="Invalid Case ID format")
-        
-    case = await db["cases"].find_one({"_id": oid})
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
-        
+async def delete_case(case_id: str, case=Depends(verify_case_access), db=Depends(get_database), current_user=Depends(get_current_user)):
+    oid = case["_id"]
     await db["cases"].delete_one({"_id": oid})
     # Strict cascading deletes for related items
     await db["entities"].delete_many({"case_id": case_id})

@@ -136,23 +136,23 @@ export default function EntitiesPage() {
               onChange={(e) => setTypeFilter(e.target.value)}
               className="px-3 py-2.5 rounded-xl bg-zinc-950/40 border border-white/10 text-xs text-zinc-400 focus:outline-none focus:border-blue-500"
             >
-              <option value="ALL">All Categories</option>
-              <option value="PERSON">Persons</option>
-              <option value="ORGANIZATION">Organizations</option>
-              <option value="LOCATION">Locations</option>
-              <option value="PHONE">Communication (Phones)</option>
-              <option value="VEHICLE">Vehicles</option>
-              <option value="ACCOUNT">Financial Accounts</option>
+              <option className="bg-zinc-900 text-zinc-300" value="ALL">All Categories</option>
+              <option className="bg-zinc-900 text-zinc-300" value="PERSON">Persons</option>
+              <option className="bg-zinc-900 text-zinc-300" value="ORGANIZATION">Organizations</option>
+              <option className="bg-zinc-900 text-zinc-300" value="LOCATION">Locations</option>
+              <option className="bg-zinc-900 text-zinc-300" value="PHONE">Communication (Phones)</option>
+              <option className="bg-zinc-900 text-zinc-300" value="VEHICLE">Vehicles</option>
+              <option className="bg-zinc-900 text-zinc-300" value="ACCOUNT">Financial Accounts</option>
             </select>
             <select
               value={riskFilter}
               onChange={(e) => setRiskFilter(e.target.value)}
               className="px-3 py-2.5 rounded-xl bg-zinc-950/40 border border-white/10 text-xs text-zinc-400 focus:outline-none focus:border-blue-500"
             >
-              <option value="ALL">All Risk Indices</option>
-              <option value="HIGH">High Risk (&gt;0.7)</option>
-              <option value="MEDIUM">Medium Risk (0.4-0.7)</option>
-              <option value="LOW">Low Risk (&lt;0.4)</option>
+              <option className="bg-zinc-900 text-zinc-300" value="ALL">All Risk Indices</option>
+              <option className="bg-zinc-900 text-zinc-300" value="HIGH">High Risk (&gt;0.7)</option>
+              <option className="bg-zinc-900 text-zinc-300" value="MEDIUM">Medium Risk (0.4-0.7)</option>
+              <option className="bg-zinc-900 text-zinc-300" value="LOW">Low Risk (&lt;0.4)</option>
             </select>
           </div>
         </div>
@@ -211,7 +211,33 @@ export default function EntitiesPage() {
                         </span>
                       </td>
                       <td className="py-4 px-6 text-xs max-w-sm truncate text-zinc-500">
-                        {JSON.stringify(ent.properties || {})}
+                        {(() => {
+                            const props = ent.properties || {};
+                            if (typeof props === "object" && props !== null) {
+                              const priorityKeys = ["description", "summary", "name", "type", "category"];
+                              let displayVal = "";
+                              for (const key of priorityKeys) {
+                                if (props[key]) {
+                                  displayVal = String(props[key]);
+                                  break;
+                                }
+                              }
+                              if (!displayVal && Object.keys(props).length > 0) {
+                                displayVal = String(Object.values(props)[0]);
+                              }
+                              if (!displayVal) return "No attributes";
+                              
+                              const isLong = displayVal.length > 50;
+                              const truncated = isLong ? displayVal.substring(0, 50) + "..." : displayVal;
+                              
+                              return (
+                                <span title={displayVal} className="truncate max-w-xs inline-block">
+                                  {truncated}
+                                </span>
+                              );
+                            }
+                            return <span className="truncate max-w-xs inline-block">{String(props)}</span>;
+                          })()}
                       </td>
                       <td className="py-4 px-6">
                         <button 

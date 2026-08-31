@@ -100,9 +100,19 @@ async def read_users_me(current_user=Depends(get_current_user)):
 
 from fastapi import UploadFile, File
 import base64
+import os
 
 @router.post("/profile/avatar")
 async def upload_avatar(file: UploadFile = File(...), current_user=Depends(get_current_user), db=Depends(get_database)):
+    if file.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+        raise HTTPException(status_code=400, detail="Invalid image format. Allowed: jpeg, png, webp")
+        
+    file.file.seek(0, os.SEEK_END)
+    size = file.file.tell()
+    file.file.seek(0)
+    if size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max 5MB.")
+        
     content = await file.read()
     b64 = base64.b64encode(content).decode("utf-8")
     data_url = f"data:{file.content_type};base64,{b64}"

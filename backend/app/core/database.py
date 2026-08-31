@@ -12,7 +12,11 @@ class Settings(BaseSettings):
         env_file = (".env", "../.env")
         extra = "ignore"
 
+import os
 settings = Settings()
+
+if os.getenv("ENVIRONMENT") == "production" and settings.JWT_SECRET == "supersecretkey":
+    raise RuntimeError("Insecure JWT_SECRET in production! Please configure it securely.")
 
 class Database:
     client: AsyncIOMotorClient = None

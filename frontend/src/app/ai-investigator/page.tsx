@@ -169,10 +169,10 @@ export default function AiInvestigatorPage() {
             </div>
             <div className="space-y-3 flex-1 overflow-y-auto">
               {[
-                "Identify the shortest known relationship path between two entities in the active case.",
+                "Identify the shortest known relationship path between two entities in the active case..",
                 "Which entities currently present the highest cumulative investigative risk?",
-                "Highlight entities with unusually high relationship density.",
-                "Identify missing evidence required to strengthen the current investigation.",
+                "Highlight entities with unusually high relationship density..",
+                "Identify missing evidence required to strengthen the current investigation..",
                 "Summarize the strongest connections surrounding the highest-risk entity.",
                 "Are there any isolated entities with a disproportionately high risk score?",
                 "Identify potential financial or communication patterns across the active case.",
