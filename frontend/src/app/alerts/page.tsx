@@ -208,11 +208,7 @@ export default function AlertsPage() {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 rounded-lg font-bold text-xs transition-all shadow-sm ${
-                      activeTab === tab 
-                        ? "bg-[var(--accent-primary)] text-white border border-[var(--accent-primary)]" 
-                        : "bg-[var(--surface-primary)] border border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-secondary)]"
-                    }`}
+                    className={`filter-tab ${activeTab === tab ? 'active' : 'inactive'}`}
                   >
                     {tab} <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] ${activeTab === tab ? "bg-black/20 text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{count}</span>
                   </button>
@@ -261,9 +257,7 @@ export default function AlertsPage() {
                 return (
                   <div 
                     key={alert._id} 
-                    className={`p-5 bg-[var(--surface-primary)] border border-[var(--border-primary)] hover:border-[var(--border-secondary)] hover:bg-[var(--surface-hover)] rounded-2xl flex flex-col gap-3 transition-all shadow-sm ${
-                      alert.status === "RESOLVED" ? "opacity-60 grayscale hover:grayscale-0" : ""
-                    }`}
+                    className={`alert-card ${alert.status === "RESOLVED" ? "resolved" : ""}`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex gap-2.5 items-center">
@@ -286,7 +280,7 @@ export default function AlertsPage() {
                     <div className="flex justify-between items-center mt-auto pt-4 border-t border-[var(--border-primary)]">
                       <div className="text-[11px] text-[var(--text-secondary)]">
                         {entityMatch ? (
-                          <>Target: <span className="font-bold text-[var(--text-primary)] px-1 py-0.5 rounded bg-[var(--surface-tertiary)]">{entityMatch.name}</span></>
+                          <>Target: <span className="font-bold text-[var(--text-primary)] px-1 py-0.5 rounded target-badge">{entityMatch.name}</span></>
                         ) : (
                           <span className="italic">System Alert</span>
                         )}

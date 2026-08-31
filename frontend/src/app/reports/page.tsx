@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 
 const PDFDownloadLink = dynamic(() => import('@react-pdf/renderer').then(mod => mod.PDFDownloadLink), { ssr: false });
 import CaseReportPDF from '@/components/reports/CaseReportPDF';
+import DownloadButton from '@/components/ui/DownloadButton';
 
 export default function ReportsPage() {
   const { activeCaseId, activeCase } = useCase();
@@ -90,9 +91,9 @@ export default function ReportsPage() {
             <PDFDownloadLink
               document={<CaseReportPDF caseData={activeCase} entities={entities} relationships={relationships} evidence={evidenceList} />}
               fileName={`NEXUS_Report_${activeCase?.name.replace(/\s+/g, '_')}.pdf`}
-              className="px-5 py-2.5 bg-[var(--surface-secondary)] hover:bg-[var(--surface-hover)] border border-[var(--border-primary)] text-[var(--text-primary)] rounded-xl font-bold text-sm transition-all shadow-sm flex items-center gap-2"
+              className="inline-block"
             >
-              <i className="fa-solid fa-download"></i> Download PDF
+              <DownloadButton as="div" />
             </PDFDownloadLink>
           )}
         </div>

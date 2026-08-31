@@ -1,12 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
-@import "tailwindcss";
-@import "./nexus-theme.css";
-/* Base fonts (Outfit and JetBrains Mono) are imported in layout.tsx via next/font */
+﻿import re
 
-@custom-variant dark (&:where(.dark, .dark *));
+with open('frontend/src/app/globals.css', 'r', encoding='utf-8') as f:
+    content = f.read()
 
-:root, .light {
-  /* LIGHT MODE (Clean, Premium Intelligence Platform) */
+# 1. Restore Light mode variables
+old_light_vars = '''  /* LIGHT MODE (Clean, Professional SaaS Dashboard) */
+  --app-background: #F4F7FA;
+  --foreground: #111827;
+
+  --surface-primary: #FFFFFF;
+  --surface-secondary: #F9FAFB;
+  --surface-tertiary: #F3F4F6;
+  --surface-hover: #F1F5F9;
+
+  --border-primary: #E5E7EB;
+  --border-secondary: #D1D5DB;
+  
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
+
+  --accent-primary: #2563EB;
+  --accent-secondary: #3B82F6;
+  
+  --danger: #EF4444;
+  --warning: #F59E0B;
+  --success: #10B981;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);'''
+
+new_light_vars = '''  /* LIGHT MODE (Clean, Premium Intelligence Platform) */
   --app-background: #F7F8FC;
   --foreground: #0B1120;
 
@@ -31,175 +56,21 @@
 
   --shadow-sm: 0 1px 2px 0 rgba(200, 175, 240, 0.1);
   --shadow-md: 0 4px 6px -1px rgba(20, 200, 235, 0.05), 0 2px 4px -2px rgba(20, 200, 235, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(20, 200, 235, 0.1), 0 4px 6px -4px rgba(20, 200, 235, 0.05);
-}
+  --shadow-lg: 0 10px 15px -3px rgba(20, 200, 235, 0.1), 0 4px 6px -4px rgba(20, 200, 235, 0.05);'''
 
-.dark {
-  /* DARK MODE (Current Premium Intelligence Platform) */
-  --app-background: #0B1120;
-  --foreground: #F9FAFB;
+content = content.replace(old_light_vars, new_light_vars)
 
-  --surface-primary: #111827;
-  --surface-secondary: #1F2937;
-  --surface-tertiary: #374151;
-  --surface-hover: #1F2937;
+# 2. Add input focus light mode
+content = content.replace('.input-field:focus {\n  outline: none;\n  border-color: var(--accent-primary);\n  box-shadow: 0 0 0 1px var(--accent-primary);\n}', '.input-field:focus {\n  outline: none;\n  border-color: var(--accent-primary);\n  box-shadow: 0 0 0 1px var(--accent-primary);\n}\n\n/* Light mode specific input focus override (Cyan glow) */\n.light .input-field:focus {\n  border-color: var(--accent-secondary);\n  box-shadow: 0 0 8px rgba(20, 200, 235, 0.3);\n}')
 
-  --border-primary: #374151;
-  --border-secondary: #4B5563;
-  
-  --text-primary: #F9FAFB;
-  --text-secondary: #D1D5DB;
-  --text-muted: #9CA3AF;
+# 3. Add btn-primary light mode
+content = content.replace('.btn-primary:hover {\n  background-color: var(--accent-secondary);\n}', '.btn-primary:hover {\n  background-color: var(--accent-secondary);\n}\n\n/* Light mode primary button gradient and hover */\n.light .btn-primary {\n  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));\n  color: #FFFFFF;\n  border: none;\n}\n.light .btn-primary:hover {\n  background: linear-gradient(135deg, #B59CE1, #10B4D4);\n  transform: translateY(-1px);\n  box-shadow: 0 4px 12px rgba(200, 175, 240, 0.4);\n}')
 
-  --accent-primary: #3B82F6;
-  --accent-secondary: #60A5FA;
-  
-  --danger: #F87171;
-  --warning: #FBBF24;
-  --success: #34D399;
+# 4. Add btn-secondary light mode
+content = content.replace('.btn-secondary:hover {\n  background-color: var(--surface-hover);\n  border-color: var(--border-secondary);\n}', '.btn-secondary:hover {\n  background-color: var(--surface-hover);\n  border-color: var(--border-secondary);\n}\n\n/* Light mode secondary button */\n.light .btn-secondary {\n  background-color: #FFFFFF;\n  border-color: var(--border-primary);\n}\n.light .btn-secondary:hover {\n  background-color: rgba(20, 200, 235, 0.05);\n  border-color: var(--accent-secondary);\n  box-shadow: 0 2px 8px rgba(20, 200, 235, 0.15);\n}')
 
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
-}
-
-body {
-  background-color: var(--app-background);
-  color: var(--text-primary);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  margin: 0;
-  padding: 0;
-}
-
-/* Scrollbar styling for a professional look */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: var(--app-background);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border-secondary);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-primary);
-}
-
-/* Shared utility classes */
-.card {
-  background-color: var(--surface-primary);
-  border: 1px solid var(--border-primary);
-  border-radius: 0.5rem;
-  box-shadow: var(--shadow-sm);
-}
-
-.input-field {
-  background-color: var(--surface-secondary);
-  border: 1px solid var(--border-primary);
-  color: var(--text-primary);
-  border-radius: 0.375rem;
-  padding: 0.5rem 0.75rem;
-  width: 100%;
-}
-.input-field:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 1px var(--accent-primary);
-}
-
-/* Light mode specific input focus override (Cyan glow) */
-.light .input-field:focus {
-  border-color: var(--accent-secondary);
-  box-shadow: 0 0 8px rgba(20, 200, 235, 0.3);
-}
-
-.btn-primary {
-  background-color: var(--accent-primary);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-  font-weight: 500;
-  transition: background-color 0.2s;
-}
-.btn-primary:hover {
-  background-color: var(--accent-secondary);
-}
-
-/* Light mode primary button gradient and hover */
-.light .btn-primary {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  color: #FFFFFF;
-  border: none;
-}
-.light .btn-primary:hover {
-  background: linear-gradient(135deg, #B59CE1, #10B4D4);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(200, 175, 240, 0.4);
-}
-
-.btn-secondary {
-  background-color: var(--surface-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-primary);
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-  font-weight: 500;
-  transition: background-color 0.2s, border-color 0.2s;
-}
-.btn-secondary:hover {
-  background-color: var(--surface-hover);
-  border-color: var(--border-secondary);
-}
-
-/* Light mode secondary button */
-.light .btn-secondary {
-  background-color: #FFFFFF;
-  border-color: var(--border-primary);
-}
-.light .btn-secondary:hover {
-  background-color: rgba(20, 200, 235, 0.05);
-  border-color: var(--accent-secondary);
-  box-shadow: 0 2px 8px rgba(20, 200, 235, 0.15);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  *, *::before, *::after {
-    transition-property: background-color, border-color, color, text-decoration-color, box-shadow;
-    transition-duration: 0.25s;
-    transition-timing-function: ease;
-  }
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  background: var(--app-background);
-  color: var(--foreground);
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-@media print {
-  @page {
-    size: A4;
-    margin: 15mm;
-  }
-  
-  body {
-    background: white;
-    color: black;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  
-  .print\:hidden {
-    display: none !important;
-  }
-}
-
+# 5. Append all semantic classes (including original + NEW AI classes)
+semantic_classes = '''
 /* --- NEXUS SEMANTIC CLASSES --- */
 
 /* Sidebar Navigation Items */
@@ -391,3 +262,11 @@ body {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
   transform: translateY(-1px);
 }
+'''
+if "NEXUS SEMANTIC CLASSES" not in content:
+    content += semantic_classes
+
+with open('frontend/src/app/globals.css', 'w', encoding='utf-8') as f:
+    f.write(content)
+
+print('Globals CSS restored and updated successfully.')

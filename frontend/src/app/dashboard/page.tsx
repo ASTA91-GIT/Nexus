@@ -85,9 +85,7 @@ export default function Dashboard() {
         )}
       </div>
       
-      {/* OVERLAY GRADIENTS FOR SPATIAL DEPTH */}
-      <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-b from-[var(--app-background)] via-transparent to-[var(--app-background)] opacity-60" />
-      <div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-r from-[var(--app-background)] via-transparent to-[var(--app-background)] opacity-40" />
+      {/* OVERLAY GRADIENTS FOR SPATIAL DEPTH (Removed due to transparent interpolation bug) */}
 
       {/* FLOATING PANELS */}
       <div className="absolute inset-0 z-20 p-6 flex flex-col justify-between pointer-events-none">

@@ -83,7 +83,7 @@ export default function AiInvestigatorPage() {
       ) : (
         <div className="flex-1 flex gap-6 min-h-0 overflow-hidden px-4">
           
-          <div className="flex-1 border border-[var(--border-primary)] bg-[var(--surface-primary)] rounded-2xl flex flex-col min-h-0 backdrop-blur-md shadow-2xl overflow-hidden">
+          <div className="flex-1 border border-[var(--border-primary)] bg-[var(--surface-primary)] rounded-2xl flex flex-col min-h-0 backdrop-blur-md shadow-2xl overflow-hidden ai-chat-panel">
             <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-md mx-auto">
@@ -135,7 +135,7 @@ export default function AiInvestigatorPage() {
                                 window.location.href = "/investigate";
                               }
                             }}
-                            className="px-3 py-1.5 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all"
+                            className="px-3 py-1.5 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-primary)] text-[var(--text-primary)] font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all btn-neutral"
                           >
                             Execute: {act.type.replace("_", " ")}
                           </button>
@@ -153,7 +153,7 @@ export default function AiInvestigatorPage() {
                 <input 
                   type="text" placeholder="Ask NEXUS AI (e.g. 'how is John Doe connected to Alice Smith?')"
                   value={inputValue} onChange={(e) => setInputValue(e.target.value)} disabled={sending} required
-                  className="flex-1 px-4 py-3 rounded-xl bg-[var(--surface-primary)] border border-[var(--border-primary)] text-sm focus:outline-none focus:border-[var(--primary-accent)] text-[var(--text-primary)] transition-colors shadow-inner"
+                  className="flex-1 px-4 py-3 rounded-xl bg-[var(--surface-primary)] border border-[var(--border-primary)] text-sm focus:outline-none focus:border-[var(--primary-accent)] text-[var(--text-primary)] transition-colors shadow-inner chat-input-field"
                 />
                 <button type="submit" disabled={sending || !inputValue.trim()} className="px-6 py-3 bg-[var(--primary-accent)] hover:bg-[var(--primary-hover)] disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-[var(--primary-accent)]/20">
                   {sending ? "Analyzing..." : "Query"}
@@ -162,7 +162,7 @@ export default function AiInvestigatorPage() {
             </div>
           </div>
 
-          <aside className="w-80 bg-[var(--surface-primary)] border border-[var(--border-primary)] p-5 rounded-2xl flex flex-col gap-5 backdrop-blur-md shrink-0 shadow-2xl">
+          <aside className="w-80 bg-[var(--surface-primary)] border border-[var(--border-primary)] p-5 rounded-2xl flex flex-col gap-5 backdrop-blur-md shrink-0 shadow-2xl ai-prompts-panel">
             <div>
               <h3 className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wider">💡 Suggested Prompts</h3>
               <p className="text-[10px] text-[var(--text-secondary)] leading-tight mt-1">Quick grounded case actions.</p>
@@ -180,7 +180,7 @@ export default function AiInvestigatorPage() {
               ].map((query, i) => (
                 <button 
                   key={i} onClick={() => handleSuggest(query)}
-                  className="w-full text-left p-3.5 rounded-xl border border-[var(--border-primary)] hover:border-[var(--primary-accent)]/50 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all font-semibold leading-relaxed cursor-pointer"
+                  className="w-full text-left p-3.5 rounded-xl border border-[var(--border-primary)] hover:border-[var(--primary-accent)]/50 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all font-semibold leading-relaxed cursor-pointer prompt-card"
                 >
                   &ldquo;{query}&rdquo;
                 </button>

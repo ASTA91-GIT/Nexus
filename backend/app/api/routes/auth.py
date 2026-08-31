@@ -112,3 +112,11 @@ async def upload_avatar(file: UploadFile = File(...), current_user=Depends(get_c
         {"$set": {"avatar": data_url}}
     )
     return {"message": "Avatar updated successfully", "avatar_url": data_url}
+
+@router.delete("/profile/avatar")
+async def remove_avatar(current_user=Depends(get_current_user), db=Depends(get_database)):
+    await db["users"].update_one(
+        {"_id": current_user["_id"]},
+        {"$unset": {"avatar": ""}}
+    )
+    return {"message": "Avatar removed successfully"}

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { finalCtaContent } from '@/content/final-cta';
 import { ctaReveal, sectionRevealViewport } from '@/lib/motion';
+import GetStartedButton from '../ui/GetStartedButton';
 
 export default function FinalCTASection() {
   return (
@@ -25,13 +26,7 @@ export default function FinalCTASection() {
           {finalCtaContent.description}
         </p>
 
-        <Link 
-          href={finalCtaContent.cta.href} 
-          className="inline-flex items-center justify-center gap-4 px-10 py-5 rounded-full bg-white text-black font-display font-black tracking-widest hover:bg-gray-200 transition-all duration-300 hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_60px_rgba(255,255,255,0.2)] group"
-        >
-          {finalCtaContent.cta.label.replace('→', '').trim()}
-          <span className="group-hover:translate-x-1 transition-transform">→</span>
-        </Link>
+        <GetStartedButton href={finalCtaContent.cta.href} className="mt-4" />
       </motion.div>
     </section>
   );

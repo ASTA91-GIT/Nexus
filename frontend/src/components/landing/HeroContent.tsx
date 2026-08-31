@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import Link from 'next/link';
+import GetStartedButton from '../ui/GetStartedButton';
 
 export default function HeroContent() {
   return (
@@ -31,13 +32,7 @@ export default function HeroContent() {
 
           {/* Buttons */}
           <div className="flex flex-col sm:flex-row gap-5">
-            <Link 
-              href="/login" 
-              className="px-8 py-4 rounded-lg bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white font-bold tracking-wide text-sm flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(59,130,246,0.3)] hover:shadow-[0_0_40px_rgba(59,130,246,0.5)] transition-all duration-300 hover:-translate-y-0.5 group"
-            >
-              ENTER NEXUS 
-              <span className="group-hover:translate-x-1 transition-transform">→</span>
-            </Link>
+            <GetStartedButton href="/login" />
             <a 
               href="#capabilities" 
               className="px-8 py-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white font-semibold tracking-wide text-sm flex items-center justify-center backdrop-blur-sm transition-all duration-300"

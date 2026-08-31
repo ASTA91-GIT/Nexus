@@ -535,7 +535,7 @@ export default function InvestigatePage() {
             <NetworkScene 
               data={filteredGraphData} 
               onNodeClick={(n: any) => {
-                const ent = entities.find(e => e._id === n.id);
+                const ent = entities.find(e => String(e._id) === String(n.id));
                 if (ent) setSelectedEntity(ent);
                 setSelectedRelationship(null);
               }}

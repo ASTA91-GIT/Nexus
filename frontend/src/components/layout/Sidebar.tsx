@@ -141,11 +141,7 @@ export default function Sidebar() {
                 <Link 
                   key={item.path} 
                   href={item.path}
-                  className={`flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all group relative ${
-                    isActive 
-                      ? "bg-[var(--accent-primary)] text-white shadow-md shadow-[var(--accent-primary)]/20" 
-                      : "text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] border border-transparent"
-                  }`}
+                  className={`sidebar-nav-item ${isActive ? 'active' : 'inactive'} group`}
                 >
                   <span className="text-base shrink-0">{item.icon}</span>
                   {!collapsed && <span className="truncate">{item.name}</span>}

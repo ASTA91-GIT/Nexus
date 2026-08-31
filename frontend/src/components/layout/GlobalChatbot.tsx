@@ -123,9 +123,9 @@ export default function GlobalChatbot() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="h-14 w-14 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-xl shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all cursor-pointer relative group"
+          className="chat-floating-btn relative group"
         >
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-20 pointer-events-none group-hover:hidden" />
+          <span className="chat-ping pointer-events-none group-hover:hidden" />
           🤖
         </button>
       )}
