@@ -1,6 +1,5 @@
 <div align="center">
-
-<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/master/svgs/solid/shield-halved.svg" width="80" height="80" alt="NEXUS Logo" />
+  <img src="docs/images/nexus-logo.jpg" width="200" alt="NEXUS Logo" />
 
 # NEXUS
 
