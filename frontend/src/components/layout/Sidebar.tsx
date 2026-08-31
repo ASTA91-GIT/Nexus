@@ -117,7 +117,7 @@ export default function Sidebar() {
           >
             {cases.map((c) => (
               <option key={c._id} value={c._id}>
-                {collapsed ? c.name.slice(0, 3).toUpperCase() : `${c.name} (${c.status})`}
+                {collapsed ? c.name.slice(0, 3).toUpperCase() : c.name}
               </option>
             ))}
           </select>

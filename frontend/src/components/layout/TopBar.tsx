@@ -5,7 +5,7 @@ import { useCase } from "@/context/CaseContext";
 import { useTheme } from "@/context/ThemeContext";
 
 export default function TopBar() {
-  const { activeCase, cases, setActiveCaseId, logout } = useCase();
+  const { activeCase, cases, activeCaseId, setActiveCaseId, logout } = useCase();
   const { theme, setTheme } = useTheme();
   
   const [profileOpen, setProfileOpen] = useState(false);
@@ -24,6 +24,9 @@ export default function TopBar() {
     return () => window.removeEventListener("avatar-updated", loadAvatar);
   }, []);
 
+  // Synchronously compute the current case from the cases array to prevent async UI desync
+  const currentCase = cases.find(c => c._id === activeCaseId) || activeCase;
+
   return (
     <header className="h-14 border-b border-[var(--border-primary)] bg-[var(--surface-primary)] flex items-center justify-between px-4 z-40 relative shadow-md">
       {/* Left: Active Case & System Status */}
@@ -41,7 +44,7 @@ export default function TopBar() {
             <i className="fa-regular fa-folder text-[var(--text-muted)] group-hover:text-[var(--accent-secondary)] transition-colors"></i>
             <span className="text-[var(--text-muted)] font-medium">Case</span>
             <span className="text-[var(--border-secondary)] mx-1 select-none">•</span>
-            <span className="font-bold tracking-wide group-hover:text-[var(--accent-secondary)] transition-colors">{activeCase ? activeCase.name : "NO ACTIVE CASE"}</span>
+            <span className="font-bold tracking-wide group-hover:text-[var(--accent-secondary)] transition-colors">{currentCase ? currentCase.name : "NO ACTIVE CASE"}</span>
             <i className={`fa-solid fa-chevron-down text-[10px] ml-1 transition-opacity ${caseDropdownOpen ? 'opacity-100 text-[var(--accent-secondary)]' : 'text-[var(--text-muted)] opacity-0 group-hover:opacity-100'}`}></i>
           </div>
 
@@ -57,7 +60,7 @@ export default function TopBar() {
                     setActiveCaseId(c._id);
                     setCaseDropdownOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors ${activeCase?._id === c._id ? 'bg-[var(--surface-secondary)] text-[var(--accent-secondary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'}`}
+                  className={`w-full text-left px-4 py-2 text-sm transition-colors ${activeCaseId === c._id ? 'bg-[var(--surface-secondary)] text-[var(--accent-secondary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'}`}
                 >
                   <div className="font-medium truncate">{c.name}</div>
                 </button>
@@ -137,14 +140,14 @@ export default function TopBar() {
           </button>
           
           {notificationsOpen && (
-            <div className="absolute top-full right-0 mt-2 w-64 bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-2 z-50">
-              <div className="px-4 py-2 border-b border-[var(--border-primary)] flex justify-between items-center">
-                <span className="font-bold text-sm text-[var(--text-primary)]">Notifications</span>
-                <button className="text-[10px] text-[var(--accent-secondary)] hover:underline">Mark all read</button>
+            <div className="absolute top-full right-0 mt-2 w-[320px] bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-xl shadow-2xl z-50 overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-[var(--border-primary)] flex justify-between items-center bg-[var(--surface-primary)]">
+                <span className="font-semibold text-[15px] text-[var(--text-primary)]">Notifications</span>
+                <button className="text-[13px] font-medium text-blue-400 hover:text-blue-300 transition-colors">Mark all read</button>
               </div>
-              <div className="px-4 py-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] cursor-pointer transition-colors">
-                <p className="font-semibold text-[var(--text-primary)]">New high-risk entity detected</p>
-                <p className="mt-0.5">Network analysis flagged a suspect with threat &gt; 0.9</p>
+              <div className="px-4 py-4 hover:bg-[var(--surface-secondary)] cursor-pointer transition-colors">
+                <p className="font-semibold text-[14px] text-[var(--text-primary)]">New high-risk entity detected</p>
+                <p className="mt-1 text-[13px] text-[var(--text-secondary)] leading-snug">Network analysis flagged a suspect<br/>with threat &gt; 0.9</p>
               </div>
             </div>
           )}
