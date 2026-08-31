@@ -37,10 +37,12 @@ export default function LandingNavbar() {
           </div>
 
           {/* Center Nav */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-display font-medium text-nexus-text-secondary">
+          <nav className="hidden md:flex items-center gap-10 text-[11px] font-display font-bold uppercase tracking-[0.15em] text-nexus-text-secondary">
             {navContent.links.map((link, idx) => (
-              <a key={idx} href={link.href} className="hover:text-white transition-colors tracking-wide">
+              <a key={idx} href={link.href} className="group relative py-2 text-[var(--text-secondary)] hover:text-white transition-colors duration-300">
                 {link.label}
+                <div className="absolute -bottom-1 left-1/2 w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 -translate-x-1/2"></div>
+                <div className="absolute -bottom-1 left-1/2 w-1 h-1 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 -translate-x-1/2"></div>
               </a>
             ))}
           </nav>
@@ -49,13 +51,13 @@ export default function LandingNavbar() {
           <div className="flex items-center gap-6">
             <Link 
               href={navContent.signIn.href}
-              className="hidden md:block text-sm font-display font-medium text-nexus-text-secondary hover:text-white transition-colors tracking-wide"
+              className="hidden md:block text-[11px] font-display font-bold uppercase tracking-[0.1em] text-nexus-text-secondary hover:text-white transition-colors duration-300"
             >
               {navContent.signIn.label}
             </Link>
             <Link 
               href={navContent.cta.href} 
-              className="px-6 py-2.5 rounded-full text-sm font-display font-bold bg-nexus-accent-primary hover:bg-[#2563EB] text-white shadow-glow-blue hover:shadow-[0_0_25px_rgba(59,130,246,0.6)] transition-all duration-300 flex items-center gap-2 group tracking-wide"
+              className="px-6 py-2.5 rounded-full text-xs font-display font-bold uppercase tracking-wider bg-nexus-accent-primary hover:bg-[#2563EB] text-white shadow-[0_0_15px_rgba(59,130,246,0.4)] hover:shadow-[0_0_25px_rgba(59,130,246,0.8)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300 flex items-center gap-2 group"
             >
               {navContent.cta.label.replace('→', '').trim()}
               <span className="group-hover:translate-x-1 transition-transform">→</span>
