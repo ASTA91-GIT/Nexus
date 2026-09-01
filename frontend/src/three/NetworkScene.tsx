@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo, useRef, useState, useEffect } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Line, OrbitControls, Text, DragControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 
@@ -346,6 +346,54 @@ function NetworkEdge({
   );
 }
 
+function CameraController() {
+  const { camera, controls } = useThree();
+  
+  useEffect(() => {
+    const handleZoomIn = () => {
+      camera.position.z = Math.max(8, camera.position.z - 4);
+      camera.position.y = Math.max(2, camera.position.y - 1);
+      camera.updateProjectionMatrix();
+    };
+    const handleZoomOut = () => {
+      camera.position.z = Math.min(90, camera.position.z + 4);
+      camera.position.y = Math.min(20, camera.position.y + 1);
+      camera.updateProjectionMatrix();
+    };
+    const handleReset = () => {
+      camera.position.set(0, 4, 38);
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+      if (controls && (controls as any).target) {
+        (controls as any).target.set(0, 0, 0);
+      }
+    };
+    
+    const handleFocus = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && controls && (controls as any).target) {
+        (controls as any).target.set(detail.x, detail.y, detail.z);
+        // Position camera slightly offset from the node for a nice focus view
+        camera.position.set(detail.x, detail.y + 2, detail.z + 10);
+        camera.updateProjectionMatrix();
+      }
+    };
+    
+    window.addEventListener('network:zoomIn', handleZoomIn);
+    window.addEventListener('network:zoomOut', handleZoomOut);
+    window.addEventListener('network:reset', handleReset);
+    window.addEventListener('network:focus', handleFocus);
+    return () => {
+      window.removeEventListener('network:zoomIn', handleZoomIn);
+      window.removeEventListener('network:zoomOut', handleZoomOut);
+      window.removeEventListener('network:reset', handleReset);
+      window.removeEventListener('network:focus', handleFocus);
+    };
+  }, [camera, controls]);
+
+  return null;
+}
+
 export default function NetworkScene({
   data,
   onNodeClick,
@@ -480,6 +528,8 @@ export default function NetworkScene({
           label: link.type || "LINKED",
           source: sourceId,
           target: targetId,
+          sourceName: sourceNode.name,
+          targetName: targetNode.name,
           highlighted: isHighlighted,
         };
       })
@@ -518,8 +568,7 @@ export default function NetworkScene({
 
   return (
     <div className="h-full w-full min-h-[280px]">
-      <Canvas camera={{ position: [0, 4, 38], fov: 55, near: 0.1, far: 5000 }} gl={{ antialias: true, logarithmicDepthBuffer: true }}>
-        <color attach="background" args={["#05070c"]} />
+      <Canvas camera={{ position: [0, 4, 38], fov: 55, near: 0.1, far: 5000 }} gl={{ antialias: true }}>
         <ambientLight intensity={0.45} />
         <pointLight position={[40, 40, 40]} intensity={1.1} />
         <pointLight position={[-40, -20, -40]} intensity={0.45} />
@@ -533,7 +582,7 @@ export default function NetworkScene({
             label={edge.label}
             highlighted={edge.highlighted}
             dimmed={hasHighlight && !edge.highlighted}
-            onClick={isEditMode ? () => onEdgeClick?.(edge) : undefined}
+            onClick={onEdgeClick ? () => onEdgeClick(edge) : undefined}
             isModalOpen={isModalOpen}
           />
         ))}
@@ -561,6 +610,7 @@ export default function NetworkScene({
           );
         })}
 
+        <CameraController />
         <OrbitControls makeDefault enableDamping dampingFactor={0.08} maxDistance={90} minDistance={8} enabled={!isModalOpen} />
       </Canvas>
     </div>

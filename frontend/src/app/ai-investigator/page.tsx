@@ -151,11 +151,11 @@ export default function AiInvestigatorPage() {
             <div className="p-4 border-t border-[var(--border-primary)] bg-[var(--surface-secondary)]/50">
               <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(inputValue); }} className="flex gap-3">
                 <input 
-                  type="text" placeholder="Ask NEXUS AI (e.g. 'how is John Doe connected to Alice Smith?')"
+                  type="text" placeholder="Query the active case for insights, connections, or risks..."
                   value={inputValue} onChange={(e) => setInputValue(e.target.value)} disabled={sending} required
-                  className="flex-1 px-4 py-3 rounded-xl bg-[var(--surface-primary)] border border-[var(--border-primary)] text-sm focus:outline-none focus:border-[var(--primary-accent)] text-[var(--text-primary)] transition-colors shadow-inner chat-input-field"
+                  className="flex-1 px-4 py-3 rounded-xl bg-[var(--surface-primary)] border border-[var(--border-primary)] text-sm focus:outline-none focus:border-[var(--accent-primary)] text-[var(--text-primary)] transition-colors shadow-inner chat-input-field"
                 />
-                <button type="submit" disabled={sending || !inputValue.trim()} className="px-6 py-3 bg-[var(--primary-accent)] hover:bg-[var(--primary-hover)] disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-[var(--primary-accent)]/20">
+                <button type="submit" disabled={sending || !inputValue.trim()} className="px-6 py-3 bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shadow-[0_0_20px_var(--accent-primary)] hover:shadow-[0_0_30px_var(--accent-secondary)]">
                   {sending ? "Analyzing..." : "Query"}
                 </button>
               </form>

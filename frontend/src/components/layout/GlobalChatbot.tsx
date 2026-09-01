@@ -186,7 +186,7 @@ export default function GlobalChatbot() {
           </div>
 
           {/* Messages scroll area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-zinc-800/80 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-zinc-700">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 max-w-[280px] mx-auto gap-4">
                 <div className="h-10 w-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center text-lg">💡</div>
@@ -203,7 +203,7 @@ export default function GlobalChatbot() {
                     <button 
                       key={idx}
                       onClick={() => handleSuggest(sug.text)}
-                      className="w-full text-left p-2 rounded-lg border border-white/5 hover:border-white/10 bg-zinc-900/40 text-[9px] text-zinc-400 hover:text-zinc-200 transition-all font-semibold cursor-pointer truncate"
+                      className="w-full text-left p-3 rounded-xl border border-white/5 hover:border-white/10 bg-zinc-900/40 text-[9.5px] text-zinc-400 hover:text-zinc-200 transition-all font-medium cursor-pointer whitespace-normal break-words leading-relaxed"
                     >
                       {sug.icon} "{sug.text}"
                     </button>

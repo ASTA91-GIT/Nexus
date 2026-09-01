@@ -109,7 +109,7 @@ export default function Sidebar() {
           !collapsed && <p className="text-[var(--text-secondary)] text-xs italic">No cases created.</p>
         ) : (
           <select 
-            value={activeCaseId} 
+            value={activeCaseId || ""} 
             onChange={(e) => setActiveCaseId(e.target.value)}
             className={`w-full p-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-secondary)] text-xs focus:outline-none focus:border-[var(--accent-primary)] ${
               collapsed ? "text-center px-1" : ""
