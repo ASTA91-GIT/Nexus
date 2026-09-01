@@ -6,32 +6,32 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root, .light {
-  /* LIGHT MODE (Clean, Premium Intelligence Platform) */
-  --app-background: #F7F8FC;
-  --foreground: #0B1120;
+  /* LIGHT MODE (Premium Intelligence Platform) */
+  --app-background: #F5F6F2;
+  --foreground: #0F172A;
 
   --surface-primary: #FFFFFF;
-  --surface-secondary: #F0F2F9;
-  --surface-tertiary: #E8EBF5;
-  --surface-hover: #EDF0F7;
+  --surface-secondary: #F8F9F6;
+  --surface-tertiary: #F1F3EF;
+  --surface-hover: #F3F5F1;
 
-  --border-primary: #E0E3F0;
-  --border-secondary: #D0D5E8;
+  --border-primary: #E2E8F0;
+  --border-secondary: #CBD5E1;
   
-  --text-primary: #121626;
-  --text-secondary: #4A5168;
-  --text-muted: #8B94B0;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
 
-  --accent-primary: #C8AFF0;
-  --accent-secondary: #14C8EB;
+  --accent-primary: #059669; /* Refined green accent */
+  --accent-secondary: #10B981;
   
-  --danger: #EF4444;
-  --warning: #D97706; /* Refined amber/gold */
-  --success: #0F503C; /* Canopy green */
+  --danger: #DC2626;
+  --warning: #D97706;
+  --success: #059669;
 
-  --shadow-sm: 0 1px 2px 0 rgba(200, 175, 240, 0.1);
-  --shadow-md: 0 4px 6px -1px rgba(20, 200, 235, 0.05), 0 2px 4px -2px rgba(20, 200, 235, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(20, 200, 235, 0.1), 0 4px 6px -4px rgba(20, 200, 235, 0.05);
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.05), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
 }
 
 .dark {

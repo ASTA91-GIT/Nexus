@@ -7,6 +7,7 @@ from app.services.rag_service import index_document
 from datetime import datetime
 import re
 from pydantic import BaseModel
+from app.services.data_processing.pipeline import process_entity_data
 
 router = APIRouter()
 
@@ -63,17 +64,20 @@ async def process_file_background(db, case_id: str, contents: bytes, filename: s
                 }
                 existing = await db["entities"].find_one({"case_id": case_id, "name": entity_doc["name"]})
                 if not existing:
-                    await db["entities"].insert_one(entity_doc)
+                    processed_ent = await process_entity_data(db, entity_doc, case_id, mode="APPLY")
+                    await db["entities"].insert_one(processed_ent)
                     entities_created += 1
             elif "source" in record and "target" in record and "type" in record:
                 src_name = str(record["source"])
                 src_ent = await db["entities"].find_one({"case_id": case_id, "name": src_name})
                 if not src_ent:
-                    src_res = await db["entities"].insert_one({
+                    src_doc = {
                         "case_id": case_id, "type": "PERSON", "name": src_name, "properties": {},
                         "risk_score": 0.0, "created_by": current_user["email"],
                         "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()
-                    })
+                    }
+                    processed_src = await process_entity_data(db, src_doc, case_id, mode="APPLY")
+                    src_res = await db["entities"].insert_one(processed_src)
                     src_ent_id = str(src_res.inserted_id)
                     entities_created += 1
                 else:
@@ -82,11 +86,13 @@ async def process_file_background(db, case_id: str, contents: bytes, filename: s
                 tgt_name = str(record["target"])
                 tgt_ent = await db["entities"].find_one({"case_id": case_id, "name": tgt_name})
                 if not tgt_ent:
-                    tgt_res = await db["entities"].insert_one({
+                    tgt_doc = {
                         "case_id": case_id, "type": "PERSON", "name": tgt_name, "properties": {},
                         "risk_score": 0.0, "created_by": current_user["email"],
                         "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()
-                    })
+                    }
+                    processed_tgt = await process_entity_data(db, tgt_doc, case_id, mode="APPLY")
+                    tgt_res = await db["entities"].insert_one(processed_tgt)
                     tgt_ent_id = str(tgt_res.inserted_id)
                     entities_created += 1
                 else:
@@ -140,7 +146,8 @@ async def process_file_background(db, case_id: str, contents: bytes, filename: s
                                 "source": "AI_EXTRACTED", "created_by": current_user["email"],
                                 "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()
                             }
-                            res = await db["entities"].insert_one(ent_doc)
+                            processed_ai_ent = await process_entity_data(db, ent_doc, case_id, mode="APPLY")
+                            res = await db["entities"].insert_one(processed_ai_ent)
                             entity_name_to_id[ent_name.lower()] = str(res.inserted_id)
                             entities_created += 1
                             

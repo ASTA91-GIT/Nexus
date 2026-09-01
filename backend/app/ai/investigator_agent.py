@@ -458,7 +458,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         "supporting_evidence": ["Consulted vectorized case evidence in ChromaDB."] if "No specific evidence" not in evidence_context else []
     }
 
-def call_hf_api(system_prompt: str, user_prompt: str) -> str:
+def call_hf_api(system_prompt: str, user_prompt: str, model: str = "Qwen/Qwen2.5-72B-Instruct") -> str:
     """
     Calls Hugging Face Inference Client chat completion with the Qwen model.
     """
@@ -472,7 +472,7 @@ def call_hf_api(system_prompt: str, user_prompt: str) -> str:
             {"role": "user", "content": user_prompt}
         ]
         response = client.chat_completion(
-            model="Qwen/Qwen2.5-72B-Instruct",
+            model=model,
             messages=messages,
             max_tokens=400,
             temperature=0.3

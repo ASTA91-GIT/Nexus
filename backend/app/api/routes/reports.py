@@ -147,7 +147,8 @@ async def generate_report(
     prompt = f"Analyze the following factual case data and generate a short, professional executive summary, some key investigation insights, and actionable investigation recommendations. Ground your response strictly in the provided data. DO NOT hallucinate. Do not invent names, crimes, or facts.\n\nData:\n{context}\n\nFormat your response EXACTLY as JSON with keys 'executive_summary' (string), 'investigation_insights' (string), and 'recommendations' (string)."
     
     try:
-        ai_response = call_hf_api("You are an expert investigation assistant.", prompt)
+        # Use a faster, smaller model (7B) for report generation to significantly increase generation speed
+        ai_response = call_hf_api("You are an expert investigation assistant.", prompt, model="Qwen/Qwen2.5-7B-Instruct")
         if ai_response:
             # clean json
             ai_response = ai_response.replace("```json", "").replace("```", "").strip()

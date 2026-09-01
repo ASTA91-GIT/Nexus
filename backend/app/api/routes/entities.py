@@ -8,6 +8,8 @@ from datetime import datetime
 
 router = APIRouter()
 
+from app.services.data_processing.pipeline import process_entity_data
+
 @router.post("/", response_model=EntityOut)
 async def create_entity(entity: EntityCreate, db=Depends(get_database), current_user=Depends(get_current_user)):
     entity_dict = entity.dict()
@@ -21,7 +23,10 @@ async def create_entity(entity: EntityCreate, db=Depends(get_database), current_
     if not entity_dict.get("source") or entity_dict.get("source") == "UNKNOWN":
         entity_dict["source"] = "USER_CREATED"
         
-    result = await db["entities"].insert_one(entity_dict)
+    # Process data through the pipeline
+    processed_dict = await process_entity_data(db, entity_dict, entity.case_id, mode="APPLY")
+        
+    result = await db["entities"].insert_one(processed_dict)
     created_entity = await db["entities"].find_one({"_id": result.inserted_id})
     return created_entity
 
@@ -95,9 +100,16 @@ async def update_entity(entity_id: str, case_id: str, update_data: EntityUpdate,
         if "source" in update_dict:
             del update_dict["source"] # Protect AI_EXTRACTED source
             
+    # Merge existing and new data to run through pipeline
+    merged_entity = {**existing_entity, **update_dict}
+    if "_id" in merged_entity:
+        del merged_entity["_id"]
+        
+    processed_dict = await process_entity_data(db, merged_entity, case_id, mode="APPLY", exclude_id=entity_id)
+            
     await db["entities"].update_one(
         {"_id": obj_id, "case_id": case_id},
-        {"$set": update_dict}
+        {"$set": processed_dict}
     )
     
     updated_entity = await db["entities"].find_one({"_id": obj_id})

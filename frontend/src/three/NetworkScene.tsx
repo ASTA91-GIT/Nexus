@@ -3,6 +3,7 @@ import React, { useMemo, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Line, OrbitControls, Text, DragControls, Html } from "@react-three/drei";
 import * as THREE from "three";
+import { useTheme } from "@/context/ThemeContext";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faBuilding, faMapMarkerAlt, faCar, faPhone, faFileInvoice, faEnvelope, faCalendarAlt, faExclamationTriangle, faQuestionCircle } from "@fortawesome/free-solid-svg-icons";
@@ -59,7 +60,8 @@ function NetworkNode({
   id,
   secondaryEntities,
   avatar,
-  isModalOpen = false
+  isModalOpen = false,
+  theme
 }: {
   position: [number, number, number];
   color: string;
@@ -75,6 +77,7 @@ function NetworkNode({
   secondaryEntities?: any[];
   avatar?: string;
   isModalOpen?: boolean;
+  theme?: string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
@@ -163,7 +166,7 @@ function NetworkNode({
           {avatar && avatar !== "null" && avatar !== "undefined" && !imgError ? (
             <img src={avatar} alt={name} className="w-full h-full object-cover" onError={() => setImgError(true)} />
           ) : (
-            <FontAwesomeIcon icon={getIconForType(type)} className="text-white drop-shadow-md" style={{ fontSize: `${size * 14}px`, color: '#ffffff' }} />
+            <FontAwesomeIcon icon={getIconForType(type)} className="text-white drop-shadow-md" style={{ fontSize: `${size * 14}px`, color: theme === 'light' ? '#0F172A' : '#ffffff' }} />
           )}
         </div>
       </Html>
@@ -182,11 +185,11 @@ function NetworkNode({
         <Text
           position={[0, baseSize + 0.7, 0]}
           fontSize={0.42}
-          color={hovered ? "#93c5fd" : highlighted ? "#ffffff" : "#e2e8f0"}
+          color={hovered ? (theme === 'light' ? "#0284c7" : "#93c5fd") : highlighted ? (theme === 'light' ? "#0f172a" : "#ffffff") : (theme === 'light' ? "#1e293b" : "#e2e8f0")}
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.02}
-          outlineColor="#020617"
+          outlineColor={theme === 'light' ? "#ffffff" : "#020617"}
         >
           {name}
         </Text>
@@ -271,6 +274,7 @@ function NetworkEdge({
   dimmed,
   onClick,
   isModalOpen = false,
+  theme,
 }: {
   start: THREE.Vector3;
   end: THREE.Vector3;
@@ -279,6 +283,7 @@ function NetworkEdge({
   dimmed: boolean;
   onClick?: () => void;
   isModalOpen?: boolean;
+  theme?: string;
 }) {
   const midPoint = useMemo(
     () => new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5),
@@ -301,8 +306,13 @@ function NetworkEdge({
     return q;
   }, [dir]);
 
-  const color = highlighted ? "#60a5fa" : dimmed ? "#334155" : "#94a3b8";
-  const opacity = highlighted ? 1 : dimmed ? 0.12 : 0.55;
+  const color = highlighted 
+    ? (theme === 'light' ? "#2563eb" : "#60a5fa") 
+    : dimmed 
+      ? (theme === 'light' ? "#64748b" : "#334155") 
+      : (theme === 'light' ? "#1F2933" : "#94a3b8");
+      
+  const opacity = highlighted ? 1 : dimmed ? (theme === 'light' ? 0.35 : 0.12) : (theme === 'light' ? 0.8 : 0.55);
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
@@ -337,7 +347,7 @@ function NetworkEdge({
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.015}
-          outlineColor="#020617"
+          outlineColor={theme === 'light' ? "#ffffff" : "#020617"}
         >
           {label}
         </Text>
@@ -413,6 +423,8 @@ export default function NetworkScene({
   draggedPositions?: Record<string, {x: number, y: number, z: number}>;
   isModalOpen?: boolean;
 }) {
+  const { theme } = useTheme();
+
   const nodes = useMemo(() => {
     const rawNodes = data?.nodes || [];
     const rawLinks = data?.links || data?.edges || [];
@@ -584,6 +596,7 @@ export default function NetworkScene({
             dimmed={hasHighlight && !edge.highlighted}
             onClick={onEdgeClick ? () => onEdgeClick(edge) : undefined}
             isModalOpen={isModalOpen}
+            theme={theme}
           />
         ))}
 
@@ -606,6 +619,7 @@ export default function NetworkScene({
               secondaryEntities={node.secondaryEntities}
               avatar={node.properties?.avatar_url || node.properties?.avatar || node.avatar_url || node.avatar}
               isModalOpen={isModalOpen}
+              theme={theme}
             />
           );
         })}

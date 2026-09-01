@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.routes import auth, cases, entities, relationships, evidence, ingestion, ai, network, analytics, alerts, chat, timeline, audit, stats, reports
+from app.api.routes import auth, cases, entities, relationships, evidence, ingestion, ai, network, analytics, alerts, chat, timeline, audit, stats, reports, data_quality
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -17,3 +17,4 @@ api_router.include_router(timeline.router, prefix="/timeline", tags=["timeline"]
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
 api_router.include_router(stats.router, prefix="/stats", tags=["stats"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
+api_router.include_router(data_quality.router, prefix="/data-quality", tags=["data-quality"])
