@@ -46,7 +46,7 @@ const getIconForType = (type: string) => {
   }
 };
 
-function NetworkNode({
+const NetworkNode = React.memo(function NetworkNode({
   position,
   color,
   name,
@@ -264,9 +264,9 @@ function NetworkNode({
   }
 
   return nodeContent;
-}
+});
 
-function NetworkEdge({
+const NetworkEdge = React.memo(function NetworkEdge({
   start,
   end,
   label,
@@ -354,7 +354,7 @@ function NetworkEdge({
       )}
     </group>
   );
-}
+});
 
 function CameraController() {
   const { camera, controls } = useThree();

@@ -447,16 +447,76 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
     answer = call_hf_api(system_persona, user_prompt)
     
     if not answer:
-        if case_id == "all":
-            answer = f"I am connected to the global NEXUS intelligence database. Currently, we have registered {suspects_count} unique suspect profiles and {linkages_count} connections across all investigation files."
-        else:
-            answer = f"I am connected to the active investigation database. Currently, we have registered {len(entities)} suspect profiles and {len(relationships)} connections in this case file."
+        answer = generate_fallback_answer(query, case_id, entities, relationships, evidence_context)
         
     return {
         "answer": answer,
         "actions": [],
-        "supporting_evidence": ["Consulted vectorized case evidence in ChromaDB."] if "No specific evidence" not in evidence_context else []
+        "supporting_evidence": ["Consulted vectorized case evidence in ChromaDB."] if (evidence_context and "No specific evidence" not in evidence_context) else []
     }
+
+def generate_fallback_answer(query: str, case_id: str, entities: list, relationships: list, evidence_context: str) -> str:
+    query_clean = re.sub(r'[^\w\s]', '', query.lower()).strip()
+    query_words = [w.lower() for w in re.findall(r'\b[a-zA-Z0-9]+\b', query) if len(w) > 2 and w.lower() not in ['who', 'what', 'where', 'when', 'how', 'why', 'is', 'are', 'the', 'this', 'that', 'for', 'about']]
+    
+    # 1. Search evidence context for matching sentences
+    matching_sentences = []
+    if evidence_context:
+        lines = [line.strip() for line in evidence_context.split('\n') if line.strip()]
+        for line in lines:
+            line_lower = line.lower()
+            if any(qw in line_lower for qw in query_words):
+                clean_line = re.sub(r'^\d+\.\s*', '', line)
+                if clean_line not in matching_sentences:
+                    matching_sentences.append(clean_line)
+                    
+    # 2. Search matching entities in MongoDB
+    matching_entities = []
+    for ent in entities:
+        ent_name = ent.get('name', '')
+        if any(qw in ent_name.lower() for qw in query_words):
+            matching_entities.append(ent)
+            
+    # 3. Build factual grounded response
+    if matching_sentences:
+        answer = "Based on investigation evidence:\n\n"
+        answer += "\n".join([f"• {s}" for s in matching_sentences[:5]])
+        if matching_entities:
+            ent_summary = ", ".join([f"{e['name']} ({e.get('type', 'ENTITY')})" for e in matching_entities[:3]])
+            answer += f"\n\nAssociated Entity Profile(s): {ent_summary}."
+        return answer
+
+    if matching_entities:
+        ent = matching_entities[0]
+        ent_name = ent.get('name')
+        ent_type = ent.get('type', 'ENTITY')
+        desc = ent.get('properties', {}).get('description') or ent.get('description', '')
+        risk = ent.get('risk_score', 0.5)
+        
+        answer = f"Entity Profile: {ent_name} ({ent_type})\n"
+        if desc:
+            answer += f"Description: {desc}\n"
+        answer += f"Threat Risk Index: {risk:.2f}\n"
+        
+        ent_id = str(ent['_id'])
+        rel_strs = []
+        for r in relationships:
+            src = str(r.get('source_entity_id'))
+            tgt = str(r.get('target_entity_id'))
+            r_type = r.get('type', 'LINKED')
+            if src == ent_id or tgt == ent_id:
+                other_id = tgt if src == ent_id else src
+                other_ent = next((e for e in entities if str(e['_id']) == other_id), None)
+                if other_ent:
+                    rel_strs.append(f"{r_type} -> {other_ent['name']}")
+        if rel_strs:
+            answer += f"Connections: {', '.join(rel_strs[:5])}."
+        return answer
+
+    if case_id == "all":
+        return f"I am connected to the global NEXUS intelligence database. Currently, we have registered {len(entities)} unique suspect profiles and {len(relationships)} connections across all investigation files."
+    else:
+        return f"I am connected to the active investigation database. Currently, we have registered {len(entities)} suspect profiles and {len(relationships)} connections in this case file."
 
 def call_hf_api(system_prompt: str, user_prompt: str, model: str = "Qwen/Qwen2.5-72B-Instruct") -> str:
     """

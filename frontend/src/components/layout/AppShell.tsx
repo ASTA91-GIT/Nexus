@@ -34,7 +34,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <CommandPalette />
       
       {/* Dynamic Collapsible Sidebar */}
-      <div className="print:hidden h-full flex flex-col z-20 relative"><Sidebar /></div>
+      <div className="print:hidden h-full flex flex-col z-50 relative"><Sidebar /></div>
 
       {/* Main Content Area */}
       <main className="flex-1 h-full overflow-hidden relative flex flex-col">

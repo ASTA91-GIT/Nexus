@@ -66,12 +66,13 @@ async def get_global_network(db=Depends(get_database), current_user=Depends(get_
 
 @router.get("/{case_id}", response_model=Dict[str, Any])
 async def get_network(case_id: str, db=Depends(get_database), current_user=Depends(get_current_user)):
-    entities = await db["entities"].find({"case_id": case_id}).to_list(None)
-    relationships = await db["relationships"].find({"case_id": case_id}).to_list(None)
+    entities = await db["entities"].find({"$or": [{"case_id": case_id}, {"caseId": case_id}]}).to_list(None)
+    relationships = await db["relationships"].find({"$or": [{"case_id": case_id}, {"caseId": case_id}]}).to_list(None)
     
     G = build_graph(entities, relationships)
     graph_data = get_graph_data_for_frontend(G)
     
+    print(f"[NETWORK_API] requested_case_id={case_id} raw_entities={len(entities)} raw_relationships={len(relationships)} nodes={len(graph_data.get('nodes', []))} links={len(graph_data.get('links', []))}")
     return graph_data
 
 @router.get("/{case_id}/path")

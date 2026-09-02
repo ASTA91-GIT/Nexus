@@ -83,17 +83,20 @@ export default function InvestigatePage() {
     const token = localStorage.getItem("token");
     try {
       setLoading(true);
-      const entRes = await fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } });
+      const [entRes, relRes, graphRes] = await Promise.all([
+        fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(getApiUrl(`/api/relationships/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(getApiUrl(`/api/network/${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
       let ents: any[] = [];
       if (entRes.ok) ents = await entRes.json();
       setEntities(ents);
 
-      const relRes = await fetch(getApiUrl(`/api/relationships/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } });
       let rels: any[] = [];
       if (relRes.ok) rels = await relRes.json();
       setRelationships(rels);
 
-      const graphRes = await fetch(getApiUrl(`/api/network/${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } });
       if (graphRes.ok) {
         const gData = await graphRes.json();
         setGraphData(gData);

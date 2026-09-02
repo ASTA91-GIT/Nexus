@@ -16,8 +16,16 @@ async def detect_duplicates(db, case_id: str, entity_data: Dict[str, Any], exclu
         from bson import ObjectId
         query["_id"] = {"$ne": ObjectId(exclude_id)}
         
+    import inspect
     cursor = db["entities"].find(query)
-    existing_entities = await cursor.to_list(length=10000) # Scoped strictly to case
+    if hasattr(cursor, "to_list"):
+        res = cursor.to_list(length=10000)
+        if inspect.isawaitable(res):
+            existing_entities = await res
+        else:
+            existing_entities = res
+    else:
+        existing_entities = list(cursor)
     
     # Prepare comparison fields
     name = str(entity_data.get("name", ""))

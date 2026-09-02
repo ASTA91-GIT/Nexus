@@ -125,9 +125,13 @@ export default function CasesPage() {
 
       if (res.ok) {
         setMessage({ text: "Case deleted.", isError: false });
+        if (activeCaseId === caseId) {
+          setActiveCaseId("");
+        }
         await refreshCases();
       } else {
-        setMessage({ text: "Failed to delete case.", isError: true });
+        const errorData = await res.json().catch(() => ({}));
+        setMessage({ text: errorData.detail || "Failed to delete case.", isError: true });
       }
     } catch (err) {
       console.error(err);

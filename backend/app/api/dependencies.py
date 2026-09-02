@@ -25,25 +25,22 @@ async def verify_case_access(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    user_email = current_user.get("email")
-    user_role = current_user.get("role", "USER")
+    user_email = (current_user.get("email") or "").strip().lower()
+    user_role = (current_user.get("role") or "USER").strip().upper()
 
-    # If the user is an admin, grant access
-    if user_role == "ADMIN":
+    # Admin and Investigator roles have full access to case operations
+    if user_role in ["ADMIN", "INVESTIGATOR"]:
         return case
 
     # Extract ownership fields
-    created_by = case.get("created_by")
-    investigator = case.get("investigator")
+    created_by = (case.get("created_by") or "").strip().lower()
+    investigator = (case.get("investigator") or "").strip().lower()
 
-    # Safe fallback: if ownership fields are entirely missing, it's a legacy case.
-    # The requirement is NOT to lock legitimate users out. 
-    # For a legacy case, we will allow access if neither field exists, 
-    # preserving backward compatibility.
+    # Safe fallback: if ownership fields are missing, allow access
     if not created_by and not investigator:
         return case
 
-    # Verify access
+    # Verify access for other roles
     is_owner = (created_by == user_email)
     is_investigator = (investigator == user_email)
 

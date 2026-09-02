@@ -24,10 +24,15 @@ async def process_entity_data(db, raw_data: Dict[str, Any], case_id: str, mode: 
     if name and isinstance(name, str):
         cleaned_name = clean_structured_field(name)
         norm_name = normalize_name(cleaned_name)
+        processed_data["name"] = norm_name
+        processed_data["normalizedName"] = norm_name.lower().strip()
         if norm_name != name:
-            processed_data["name"] = norm_name
             original_values["name"] = name
             actions.append("Trimmed whitespace and normalized name.")
+            
+    processed_data["normalizedType"] = str(raw_data.get("type", "PERSON")).upper()
+    processed_data["case_id"] = case_id
+    processed_data["caseId"] = case_id
             
     properties = raw_data.get("properties", {})
     processed_properties = properties.copy() if properties else {}

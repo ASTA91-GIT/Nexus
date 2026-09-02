@@ -26,13 +26,13 @@ export default function ReportsPage() {
     const token = localStorage.getItem("token");
     try {
       setLoading(true);
-      const res = await fetch(getApiUrl(`/api/reports/?case_id=${activeCaseId}`), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const entRes = await fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } });
-      const relRes = await fetch(getApiUrl(`/api/relationships/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } });
-      const evRes = await fetch(getApiUrl(`/api/evidence/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } });
-      
+      const [res, entRes, relRes, evRes] = await Promise.all([
+        fetch(getApiUrl(`/api/reports/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(getApiUrl(`/api/relationships/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(getApiUrl(`/api/evidence/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
       if (res.ok) {
         const data = await res.json();
         setReportData(data);

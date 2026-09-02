@@ -133,11 +133,13 @@ export function CaseProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (pathname !== "/login" && pathname !== "/") {
-      refreshCases();
+      if (cases.length === 0) {
+        refreshCases();
+      }
     } else {
       setLoadingCases(false);
     }
-  }, [pathname, refreshCases]);
+  }, [pathname, refreshCases, cases.length]);
 
   const handleSetActiveCaseId = (id: string) => {
     setActiveCaseId(id);

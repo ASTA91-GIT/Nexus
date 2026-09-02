@@ -49,16 +49,19 @@ export default function Dashboard() {
     try {
       setLoading(true);
       
-      // 1. Fetch Global or Active Case Network
+      // Fetch Network and Alerts in parallel
       const networkEndpoint = activeCaseId 
         ? `/api/network/${activeCaseId}` 
-        : `/api/network/global`; // We keep the global fallback if activeCaseId is empty string, though it should be a valid ID now.
+        : `/api/network/global`;
         
-      const netRes = await fetch(getApiUrl(networkEndpoint), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (netRes.ok) {
+      const [netRes, altRes] = await Promise.all([
+        fetch(getApiUrl(networkEndpoint), { headers: { Authorization: `Bearer ${token}` } }),
+        activeCaseId 
+          ? fetch(getApiUrl(`/api/alerts/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } })
+          : Promise.resolve(null)
+      ]);
+
+      if (netRes && netRes.ok) {
         const netData = await netRes.json();
         setGraphData(netData);
         
@@ -68,15 +71,9 @@ export default function Dashboard() {
         setHighRiskEntities(sorted.slice(0, 10));
       }
 
-      // 2. Fetch Alerts
-      if (activeCaseId) {
-        const altRes = await fetch(getApiUrl(`/api/alerts/?case_id=${activeCaseId}`), {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (altRes.ok) {
-          const altData = await altRes.json();
-          setAlerts(altData);
-        }
+      if (altRes && altRes.ok) {
+        const altData = await altRes.json();
+        setAlerts(altData);
       }
       
     } catch (err) {

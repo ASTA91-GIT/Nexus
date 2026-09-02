@@ -63,24 +63,16 @@ export default function LocationsPage() {
     const token = localStorage.getItem("token");
     try {
       setLoading(true);
-      // Fetch Entities
-      const entRes = await fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [entRes, relRes, evRes] = await Promise.all([
+        fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(getApiUrl(`/api/relationships/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(getApiUrl(`/api/evidence/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
       let ents: any[] = [];
       if (entRes.ok) ents = await entRes.json();
-
-      // Fetch Relationships
-      const relRes = await fetch(getApiUrl(`/api/relationships/?case_id=${activeCaseId}`), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
       let rels: any[] = [];
       if (relRes.ok) rels = await relRes.json();
-      
-      // Fetch Evidence
-      const evRes = await fetch(getApiUrl(`/api/evidence/?case_id=${activeCaseId}`), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
       let evs: any[] = [];
       if (evRes.ok) evs = await evRes.json();
 
@@ -111,9 +103,15 @@ export default function LocationsPage() {
       for (const loc of locsToGeocode) {
         if (geocodedLocations[loc._id]) continue; // Already geocoded or tried
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc.name)}&format=json&limit=1`);
-          if (res.ok) {
-            const data = await res.json();
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc.name)}&format=json&limit=1`, {
+            headers: { 'Accept': 'application/json' }
+          }).catch(err => {
+            console.warn(`Geocoding fetch unavailable for ${loc.name}:`, err);
+            return null;
+          });
+
+          if (res && res.ok) {
+            const data = await res.json().catch(() => []);
             if (data && data.length > 0) {
               newGeocoded[loc._id] = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
             }

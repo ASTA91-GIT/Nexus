@@ -92,18 +92,18 @@ export default function EntitiesPage() {
 
   // Filters & Search
   const filteredEntities = entities.filter((ent: any) => {
-    const matchSearch = ent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchSearch = (ent.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
                         JSON.stringify(ent.properties || {}).toLowerCase().includes(searchTerm.toLowerCase());
     
-    const primaryTypes = ["PERSON", "ORGANIZATION", "LOCATION", "VEHICLE"];
+    const entTypeUpper = (ent.type || "").toUpperCase();
     const matchType = typeFilter === "ALL" 
-      ? primaryTypes.includes(ent.type)
-      : ent.type === typeFilter;
+      ? true
+      : entTypeUpper === typeFilter.toUpperCase();
     
     let matchRisk = true;
-    if (riskFilter === "HIGH") matchRisk = ent.risk_score > 0.7;
-    else if (riskFilter === "MEDIUM") matchRisk = ent.risk_score >= 0.4 && ent.risk_score <= 0.7;
-    else if (riskFilter === "LOW") matchRisk = ent.risk_score < 0.4;
+    if (riskFilter === "HIGH") matchRisk = (ent.risk_score || 0) > 0.7;
+    else if (riskFilter === "MEDIUM") matchRisk = (ent.risk_score || 0) >= 0.4 && (ent.risk_score || 0) <= 0.7;
+    else if (riskFilter === "LOW") matchRisk = (ent.risk_score || 0) < 0.4;
 
     return matchSearch && matchType && matchRisk;
   });

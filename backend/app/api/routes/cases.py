@@ -57,13 +57,19 @@ async def update_case(case_id: str, updated_case: CaseCreate, db=Depends(get_dat
 @router.delete("/{case_id}")
 async def delete_case(case_id: str, case=Depends(verify_case_access), db=Depends(get_database), current_user=Depends(get_current_user)):
     oid = case["_id"]
+    case_id_str = str(oid)
+
     await db["cases"].delete_one({"_id": oid})
-    # Strict cascading deletes for related items
-    await db["entities"].delete_many({"case_id": case_id})
-    await db["relationships"].delete_many({"case_id": case_id})
-    await db["evidence"].delete_many({"case_id": case_id})
-    await db["alerts"].delete_many({"case_id": case_id})
+
+    # Strict cascading deletes for related items across case_id and caseId formats
+    query = {"$or": [{"case_id": case_id_str}, {"caseId": case_id_str}, {"case_id": oid}, {"caseId": oid}]}
+    await db["entities"].delete_many(query)
+    await db["relationships"].delete_many(query)
+    await db["evidence"].delete_many(query)
+    await db["alerts"].delete_many(query)
+    await db["timeline"].delete_many(query)
+
     from app.core.audit import log_audit_action
-    await log_audit_action(db, current_user["email"], "DELETE_CASE", case_id)
+    await log_audit_action(db, current_user["email"], "DELETE_CASE", case_id_str)
     
     return {"message": "Case and all associated records deleted successfully"}
