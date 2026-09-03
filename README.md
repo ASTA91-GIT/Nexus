@@ -324,6 +324,58 @@ http://localhost:8000
 
 ---
 
+## 🐳 Docker Setup (Team Development)
+
+NEXUS can be easily deployed for team development using Docker, providing a clean, reproducible environment.
+
+### Docker Prerequisites
+- Docker Desktop (or Docker Engine + Docker Compose)
+
+### Configuration
+Create a `.env` file from the `.env.example`:
+```bash
+cp .env.example .env
+```
+Ensure you have set any required secrets like `JWT_SECRET` and `HUGGINGFACE_API_KEY`.
+
+### Start NEXUS
+Run the following command to build and start the entire stack (Frontend, Backend, and MongoDB):
+```bash
+docker compose up --build -d
+```
+Once started, the application will be available at: `http://localhost:3000`
+
+### Stop NEXUS
+To gracefully stop the containers without losing data:
+```bash
+docker compose down
+```
+
+### Persistent Data
+The Docker setup ensures no data is lost when containers stop. 
+- **MongoDB Database**: Uses a persistent Docker volume named `mongodb_data`.
+- **Evidence Storage & ChromaDB**: Map directly to your local `./data/uploads` and `./data/chroma` directories, ensuring files survive container recreation.
+
+> **WARNING**: `docker compose down -v` WILL remove Docker volumes. Do not use the `-v` flag unless you explicitly intend to permanently delete the Docker MongoDB database.
+
+### Optional: Database Migration (Local to Docker)
+*By default, the Docker MongoDB and your existing Local MongoDB are completely separate environments.* If you wish to migrate existing local data into the Docker environment, follow this safe, optional process:
+
+1. **Backup Local MongoDB** (while local MongoDB is running):
+   ```bash
+   mongodump --db nexus --archive=nexus_backup.archive
+   ```
+2. **Start Docker MongoDB**:
+   ```bash
+   docker compose up -d mongodb
+   ```
+3. **Restore into Docker MongoDB**:
+   ```bash
+   docker exec -i nexus_mongodb mongorestore --archive < nexus_backup.archive
+   ```
+
+---
+
 ## 🧪 Testing & Verification
 
 ### Frontend Build Verification
