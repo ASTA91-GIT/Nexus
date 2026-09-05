@@ -181,8 +181,9 @@ export default function CasesPage() {
           setUploadResults(prev => [...prev, { name: file.name, status: "Success", message: data.message }]);
           return data;
         } else {
-          setUploadResults(prev => [...prev, { name: file.name, status: "Error", message: "Server rejected file." }]);
-          throw new Error("Server rejected file.");
+          const errText = await res.text();
+          setUploadResults(prev => [...prev, { name: file.name, status: "Error", message: errText || "Server rejected file." }]);
+          throw new Error(errText || "Server rejected file.");
         }
       } catch (err: any) {
         setUploadResults(prev => [...prev, { name: file.name, status: "Error", message: err.message || "Network error" }]);

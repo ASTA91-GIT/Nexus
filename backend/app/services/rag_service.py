@@ -28,7 +28,7 @@ def index_document(case_id: str, evidence_id: str, text: str):
     ids = [f"{evidence_id}_{i}" for i in range(len(chunks))]
     metadatas = [{"case_id": case_id, "evidence_id": evidence_id} for _ in chunks]
     
-    collection.add(
+    collection.upsert(
         documents=chunks,
         metadatas=metadatas,
         ids=ids

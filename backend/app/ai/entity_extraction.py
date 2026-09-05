@@ -55,52 +55,75 @@ Text to analyze:
 """
 
 async def extract_entities_and_relationships(text: str) -> Dict[str, Any]:
-    process_text = text[:6000]
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5500, chunk_overlap=200, length_function=len)
+    chunks = text_splitter.split_text(text)
     
-    if hf_client:
-        messages = [
-            {"role": "system", "content": "You are a precise data extraction system that outputs only valid JSON."},
-            {"role": "user", "content": EXTRACTION_PROMPT.format(text=process_text)}
-        ]
-        
-        try:
-            import asyncio
-            response = await asyncio.to_thread(
-                hf_client.chat_completion,
-                messages=messages,
-                model="Qwen/Qwen2.5-72B-Instruct",
-                max_tokens=4000,
-                temperature=0.1
-            )
-            
-            reply = response.choices[0].message.content.strip()
-            
-            if reply.startswith("```"):
-                reply = re.sub(r"^```(?:json)?\n?", "", reply)
-                reply = re.sub(r"\n?```$", "", reply)
-                
-            start_idx = reply.find("{")
-            end_idx = reply.rfind("}")
-            
-            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                reply = reply[start_idx:end_idx+1]
-                
-            data = json.loads(reply)
-            
-            entities = data.get("entities", [])
-            relationships = data.get("relationships", [])
-            if entities or relationships:
-                return {
-                    "entities": entities,
-                    "relationships": relationships
-                }
-            
-        except Exception as e:
-            print(f"Hugging Face AI Extraction API unavailable ({e}), using pattern extraction fallback...")
+    all_entities = []
+    all_relationships = []
+    seen_entity_keys = set()
+    seen_rel_keys = set()
 
-    # Fallback pattern extraction if HF API fails, is rate-limited, or unconfigured
-    import asyncio
-    return await asyncio.to_thread(extract_entities_and_relationships_fallback, text)
+    for process_text in chunks:
+        chunk_result = None
+        if hf_client:
+            messages = [
+                {"role": "system", "content": "You are a precise data extraction system that outputs only valid JSON."},
+                {"role": "user", "content": EXTRACTION_PROMPT.format(text=process_text)}
+            ]
+            
+            try:
+                import asyncio
+                response = await asyncio.to_thread(
+                    hf_client.chat_completion,
+                    messages=messages,
+                    model="Qwen/Qwen2.5-72B-Instruct",
+                    max_tokens=4000,
+                    temperature=0.1
+                )
+                
+                reply = response.choices[0].message.content.strip()
+                
+                if reply.startswith("```"):
+                    reply = re.sub(r"^```(?:json)?\n?", "", reply)
+                    reply = re.sub(r"\n?```$", "", reply)
+                    
+                start_idx = reply.find("{")
+                end_idx = reply.rfind("}")
+                
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    reply = reply[start_idx:end_idx+1]
+                    
+                data = json.loads(reply)
+                
+                chunk_result = {
+                    "entities": data.get("entities", []),
+                    "relationships": data.get("relationships", [])
+                }
+                
+            except Exception as e:
+                print(f"Hugging Face AI Extraction API unavailable for chunk ({e}), using pattern extraction fallback...")
+
+        if not chunk_result:
+            import asyncio
+            chunk_result = await asyncio.to_thread(extract_entities_and_relationships_fallback, process_text)
+
+        for ent in chunk_result.get("entities", []):
+            ekey = (ent.get("name", "").strip().lower(), ent.get("type", "").strip().upper())
+            if ekey not in seen_entity_keys and ekey[0]:
+                seen_entity_keys.add(ekey)
+                all_entities.append(ent)
+                
+        for rel in chunk_result.get("relationships", []):
+            rkey = (rel.get("source", "").strip().lower(), rel.get("target", "").strip().lower(), rel.get("type", "").strip().upper())
+            if rkey not in seen_rel_keys and rkey[0] and rkey[1] and rkey[0] != rkey[1]:
+                seen_rel_keys.add(rkey)
+                all_relationships.append(rel)
+
+    return {
+        "entities": all_entities,
+        "relationships": all_relationships
+    }
 
 def clean_entity_name(name: str) -> str:
     c = re.sub(r'\s+', ' ', name).strip()
@@ -158,22 +181,11 @@ def extract_entities_and_relationships_fallback(text: str) -> Dict[str, Any]:
             persons.add(f_added)
             add_rel(s_added, f_added, 'FAMILY_RELATION', f'{s_added} is related to {f_added}')
 
-    named_people = ['Vinit Yadav', 'Deepak Sharma', 'Anju Sharma', 'Ramesh Sharma', 'Vikram Singh Yadav', 'Saurabh Singh', 'Anubha Lal', 'Ravi Kumar', 'Soumya Dey']
-    for np in named_people:
-        if np.lower() in text.lower():
-            added = add_entity(np, 'PERSON', 'Key person in investigation', 0.7 if np == 'Vinit Yadav' else 0.5)
-            if added: persons.add(added)
-
     # Vehicles
     vehicles = set()
     plates = re.findall(r'\b([A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{1,4}[-\s]?\d{4})\b', text)
     for plate in plates:
         v_added = add_entity(plate, 'VEHICLE', 'Vehicle registration plate', 0.8)
-        if v_added: vehicles.add(v_added)
-        
-    v_models = re.findall(r'\b(Tata\s+Nexon|Motorcycle|Scooter|Car)\b', text, re.IGNORECASE)
-    for vm in v_models:
-        v_added = add_entity(vm, 'VEHICLE', 'Vehicle involved in incident', 0.8)
         if v_added: vehicles.add(v_added)
 
     # Weapons
@@ -184,41 +196,31 @@ def extract_entities_and_relationships_fallback(text: str) -> Dict[str, Any]:
             w_added = add_entity(w, 'WEAPON', 'Seized weapon/ammunition', 0.9)
             if w_added: weapons.add(w_added)
 
-    # Locations
-    locations = set()
-    locs = re.findall(r'\b(Sector\s+\d+|Palam|Dwarka|Gurugram|Gurgaon|Janakpuri|Uttam Nagar|Najafgarh|Rohini|Saket|Delhi|New Delhi)\b', text, re.IGNORECASE)
-    for loc in locs:
-        l_added = add_entity(loc, 'LOCATION', 'Location/Scene of interest', 0.4)
-        if l_added: locations.add(l_added)
+    # Generic pattern-based entities
+    phone_numbers = re.findall(r'\b(\+?\d{1,3}[-.\s]?\(?\d{1,4}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9})\b', text)
+    for ph in phone_numbers:
+        # Prevent standard dates from being classified as phone numbers
+        if re.match(r'^\d{2,4}[-/. ]\d{2}[-/. ]\d{2,4}$', ph.strip()):
+            continue
+        if len(re.sub(r'\D', '', ph)) >= 7:
+            add_entity(ph, 'PHONE_NUMBER', 'Phone number', 0.5)
+            
+    emails = re.findall(r'\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b', text)
+    for em in emails:
+        add_entity(em, 'EMAIL', 'Email address', 0.5)
+        
+    amounts = re.findall(r'\b((?:Rs\.?|₹|\$|USD|INR)\s*[\d,]+(?:\.\d{2})?)\b', text, re.IGNORECASE)
+    for amt in amounts:
+        add_entity(amt, 'FINANCIAL_AMOUNT', 'Financial amount', 0.5)
 
-    # Organizations / Institutions
-    orgs = set()
-    org_matches = re.findall(r'\b(Dwarka Courts|Sessions Court|FSL|Forensic Science Laboratory|Deen Dayal Upadhyay Hospital|DDU Hospital|Delhi Police)\b', text, re.IGNORECASE)
-    for org in org_matches:
-        o_added = add_entity(org, 'ORGANIZATION', 'Institutional entity', 0.4)
-        if o_added: orgs.add(o_added)
+    accounts = re.findall(r'\b(?:Account|A/c|Acct)\s*(?:No\.|Number)?\s*[:\-]?\s*([A-Z0-9-]{6,20})\b', text, re.IGNORECASE)
+    for acc in accounts:
+        add_entity(acc, 'ACCOUNT', 'Account number', 0.7)
 
     # Documents
     doc_matches = re.findall(r'\b(FIR\s+No\.\s*\d+/\d+|SC\s+No\.\s*\d+/\d+|MLC\s+No\.\s*[\d/]+)\b', text, re.IGNORECASE)
     for doc in doc_matches:
         add_entity(doc, 'DOCUMENT', 'Legal case document', 0.5)
-
-    # Contextual relationships
-    if 'Vinit Yadav' in persons:
-        for v in vehicles:
-            add_rel('Vinit Yadav', v, 'OPERATED_VEHICLE', f'Vinit Yadav connected to vehicle {v}')
-        for w in weapons:
-            add_rel('Vinit Yadav', w, 'POSSESSED_WEAPON', f'Vinit Yadav linked to weapon {w}')
-        for l in locations:
-            add_rel('Vinit Yadav', l, 'LOCATED_AT', f'Vinit Yadav associated with {l}')
-        if 'Deepak Sharma' in persons:
-            add_rel('Vinit Yadav', 'Deepak Sharma', 'INVOLVED_WITH', 'Accused and Complainant in incident')
-
-    for p in persons:
-        if p != 'Vinit Yadav':
-            for l in locations:
-                if l in ['Dwarka', 'Delhi', 'New Delhi', 'Palam']:
-                    add_rel(p, l, 'LOCATED_AT', f'{p} associated with {l}')
 
     return {"entities": entities, "relationships": relationships}
 

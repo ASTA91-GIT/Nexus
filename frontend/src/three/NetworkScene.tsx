@@ -1,7 +1,7 @@
 "use client";
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Line, OrbitControls, Text, DragControls, Html } from "@react-three/drei";
+import { OrbitControls, Text, DragControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -322,19 +322,21 @@ const NetworkEdge = React.memo(function NetworkEdge({
     }
   }, [hovered, onClick, isModalOpen]);
 
+  const length = useMemo(() => start.distanceTo(end), [start, end]);
+
   return (
     <group 
       onPointerOver={(e) => { if(onClick && !isModalOpen) { e.stopPropagation(); setHovered(true); } }}
       onPointerOut={(e) => { if(onClick && !isModalOpen) { e.stopPropagation(); setHovered(false); } }}
       onClick={(e) => { if (onClick && !isModalOpen) { e.stopPropagation(); onClick(); } }}
     >
-      <Line
-        points={[start, end]}
-        color={hovered ? "#ffffff" : color}
-        lineWidth={highlighted ? 2.5 : 1.2}
-        transparent
-        opacity={opacity}
-      />
+      {length > 0 && (
+        <mesh position={midPoint} quaternion={quaternion}>
+          <cylinderGeometry args={[highlighted ? 0.08 : 0.04, highlighted ? 0.08 : 0.04, length, 8]} />
+          <meshBasicMaterial color={hovered ? "#ffffff" : color} transparent opacity={opacity} />
+        </mesh>
+      )}
+
       <mesh position={arrowPos} quaternion={quaternion}>
         <coneGeometry args={[0.2, 0.6, 8]} />
         <meshBasicMaterial color={hovered ? "#ffffff" : color} transparent opacity={opacity} />
@@ -521,6 +523,7 @@ export default function NetworkScene({
         const sourceNode = nodeById.get(sourceId);
         const targetNode = nodeById.get(targetId);
         if (!sourceNode || !targetNode) return null;
+        if (sourceId === targetId) return null; // Prevent self-loops
 
         let isHighlighted = false;
         for (let i = 0; i < path.length - 1; i++) {

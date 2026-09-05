@@ -22,6 +22,10 @@ async def extract_text_from_file(file_path: str, filename: str) -> str:
                 return extract_text_from_json(file_path)
             elif ext in [".xls", ".xlsx"]:
                 return extract_text_from_excel(file_path)
+            elif ext == ".docx":
+                return extract_text_from_docx(file_path)
+            elif ext in [".webm", ".mp4", ".mp3", ".png", ".jpg", ".jpeg"]:
+                return "UNSUPPORTED_MEDIA"
             else:
                 # Fallback for unsupported or unknown text files
                 try:
@@ -52,3 +56,26 @@ def extract_text_from_json(file_path: str) -> str:
 def extract_text_from_excel(file_path: str) -> str:
     df = pd.read_excel(file_path)
     return df.to_string()
+
+def extract_text_from_docx(file_path: str) -> str:
+    try:
+        import docx
+    except ImportError:
+        return "python-docx not installed"
+        
+    doc = docx.Document(file_path)
+    text = []
+    for para in doc.paragraphs:
+        if para.text.strip():
+            text.append(para.text.strip())
+            
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = []
+            for cell in row.cells:
+                if cell.text.strip():
+                    row_text.append(cell.text.strip())
+            if row_text:
+                text.append(" | ".join(row_text))
+                
+    return "\n".join(text).strip()

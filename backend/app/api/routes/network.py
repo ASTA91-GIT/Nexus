@@ -4,6 +4,7 @@ from typing import Any, Dict
 from app.core.database import get_database
 from app.api.routes.auth import get_current_user
 from app.graph.graph_builder import build_graph, get_graph_data_for_frontend
+from app.api.dependencies import verify_case_access
 
 router = APIRouter()
 
@@ -65,7 +66,12 @@ async def get_global_network(db=Depends(get_database), current_user=Depends(get_
     return graph_data
 
 @router.get("/{case_id}", response_model=Dict[str, Any])
-async def get_network(case_id: str, db=Depends(get_database), current_user=Depends(get_current_user)):
+async def get_network(
+    case_id: str, 
+    db=Depends(get_database), 
+    current_user=Depends(get_current_user),
+    case=Depends(verify_case_access)
+):
     entities = await db["entities"].find({"$or": [{"case_id": case_id}, {"caseId": case_id}]}).to_list(None)
     relationships = await db["relationships"].find({"$or": [{"case_id": case_id}, {"caseId": case_id}]}).to_list(None)
     
@@ -81,7 +87,8 @@ async def get_shortest_path(
     source: str,
     target: str,
     db=Depends(get_database),
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    case=Depends(verify_case_access)
 ):
     entities = await db["entities"].find({"case_id": case_id}).to_list(None)
     relationships = await db["relationships"].find({"case_id": case_id}).to_list(None)
