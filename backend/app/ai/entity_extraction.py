@@ -64,7 +64,9 @@ async def extract_entities_and_relationships(text: str) -> Dict[str, Any]:
         ]
         
         try:
-            response = hf_client.chat_completion(
+            import asyncio
+            response = await asyncio.to_thread(
+                hf_client.chat_completion,
                 messages=messages,
                 model="Qwen/Qwen2.5-72B-Instruct",
                 max_tokens=4000,
@@ -97,7 +99,8 @@ async def extract_entities_and_relationships(text: str) -> Dict[str, Any]:
             print(f"Hugging Face AI Extraction API unavailable ({e}), using pattern extraction fallback...")
 
     # Fallback pattern extraction if HF API fails, is rate-limited, or unconfigured
-    return extract_entities_and_relationships_fallback(text)
+    import asyncio
+    return await asyncio.to_thread(extract_entities_and_relationships_fallback, text)
 
 def clean_entity_name(name: str) -> str:
     c = re.sub(r'\s+', ' ', name).strip()

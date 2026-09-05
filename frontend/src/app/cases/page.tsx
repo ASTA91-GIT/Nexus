@@ -161,9 +161,7 @@ export default function CasesPage() {
     setUploadResults([]);
     const token = localStorage.getItem("token");
     
-    const results = [];
-    
-    for (const file of selectedFiles) {
+    const uploadPromises = selectedFiles.map(async (file) => {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("case_id", activeCaseId);
@@ -180,16 +178,20 @@ export default function CasesPage() {
 
         if (res.ok) {
           const data = await res.json();
-          results.push({ name: file.name, status: "Success", message: data.message });
+          setUploadResults(prev => [...prev, { name: file.name, status: "Success", message: data.message }]);
+          return data;
         } else {
-          results.push({ name: file.name, status: "Error", message: "Server rejected file." });
+          setUploadResults(prev => [...prev, { name: file.name, status: "Error", message: "Server rejected file." }]);
+          throw new Error("Server rejected file.");
         }
       } catch (err: any) {
-        results.push({ name: file.name, status: "Error", message: err.message || "Network error" });
+        setUploadResults(prev => [...prev, { name: file.name, status: "Error", message: err.message || "Network error" }]);
+        throw err;
       }
-    }
+    });
 
-    setUploadResults(results);
+    await Promise.allSettled(uploadPromises);
+
     setSelectedFiles([]);
     setUploading(false);
     if(fileInputRef.current) fileInputRef.current.value = "";

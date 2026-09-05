@@ -28,7 +28,8 @@ async def process_evidence_text_background(db, file_path: str, filename: str, ca
         relationships_created = 0
 
         if status == "SUCCESS":
-            index_document(case_id, evidence_id, extracted_text)
+            import asyncio
+            await asyncio.to_thread(index_document, case_id, evidence_id, extracted_text)
             
             try:
                 ai_results = await extract_entities_and_relationships(extracted_text)

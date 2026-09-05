@@ -51,6 +51,63 @@ export default function EvidencePage() {
     fetchEvidence();
   }, [fetchEvidence]);
 
+  // Polling mechanism to auto-update evidence list while processing
+  const isPolling = useRef<boolean>(false);
+  const wasProcessing = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (!activeCaseId) return;
+
+    let intervalId: NodeJS.Timeout;
+    
+    const checkProcessingStatus = async () => {
+      if (isPolling.current) return;
+      isPolling.current = true;
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        isPolling.current = false;
+        return;
+      }
+      
+      try {
+        const res = await fetch(getApiUrl(`/api/evidence/?case_id=${activeCaseId}`), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const latestEvidenceList = await res.json();
+          const processingCount = latestEvidenceList.filter((e: any) => e.processing_status === "PROCESSING").length;
+          
+          if (processingCount > 0) {
+            wasProcessing.current = true;
+            // Also update the UI with the latest list if there is a change, or just calling fetchEvidence 
+            // Wait, to avoid double loading state, we can just update the state silently
+            setEvidenceList(latestEvidenceList);
+          } else if (processingCount === 0 && wasProcessing.current) {
+            wasProcessing.current = false;
+            setEvidenceList(latestEvidenceList);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check evidence processing status:", err);
+      } finally {
+        isPolling.current = false;
+      }
+    };
+
+    wasProcessing.current = false;
+    isPolling.current = false;
+
+    // Start polling every 3 seconds to check for processing updates
+    intervalId = setInterval(checkProcessingStatus, 3000);
+    checkProcessingStatus();
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [activeCaseId]);
+
   // Audio Recording Logic
   const startRecording = async () => {
     try {
@@ -211,34 +268,50 @@ export default function EvidencePage() {
                     if (!files || files.length === 0 || !activeCaseId) return;
                     
                     const token = localStorage.getItem("token");
-                    let hasError = false;
-
+                    
                     setMessage({ text: `Uploading ${files.length} file(s)...`, isError: false });
 
-                    for (let i = 0; i < files.length; i++) {
+                    const uploadPromises = Array.from(files).map(async (file) => {
                       const formData = new FormData();
-                      formData.append("file", files[i]);
+                      formData.append("file", file);
                       formData.append("case_id", activeCaseId);
-                      formData.append("title", files[i].name);
+                      formData.append("title", file.name);
                       
-                      try {
-                        const res = await fetch(getApiUrl("/api/evidence/upload"), {
-                          method: "POST",
-                          headers: { Authorization: `Bearer ${token}` },
-                          body: formData
-                        });
-                        if (!res.ok) hasError = true;
-                      } catch (err) {
-                        hasError = true;
-                      }
-                    }
+                      const res = await fetch(getApiUrl("/api/evidence/upload"), {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${token}` },
+                        body: formData
+                      });
+                      
+                      if (!res.ok) throw new Error("Upload failed");
+                      const data = await res.json();
+                      
+                      // Immediately add to UI state
+                      const newEvidence = {
+                        _id: data.evidence_id,
+                        title: file.name,
+                        source_type: file.name.split('.').pop()?.toUpperCase() || 'UNKNOWN',
+                        created_by: "Uploading...",
+                        created_at: new Date().toISOString(),
+                        processing_status: "PROCESSING"
+                      };
+                      
+                      setEvidenceList(prev => [newEvidence, ...prev]);
+                      return data;
+                    });
+
+                    const results = await Promise.allSettled(uploadPromises);
+                    const hasError = results.some(r => r.status === 'rejected');
 
                     if (hasError) {
                       setMessage({ text: "Some files failed to upload. Check console for details.", isError: true });
                     } else {
                       setMessage({ text: "All files uploaded successfully.", isError: false });
                     }
+                    
+                    // Trigger one final sync to ensure we have the fully correct data from server
                     fetchEvidence();
+                    
                     // Clear input
                     e.target.value = "";
                   }} 

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -70,6 +70,64 @@ export default function NetworkPage() {
       fetchGraphData(activeCaseId);
     }
   }, [activeCaseId, fetchGraphData]);
+
+  // Polling mechanism to auto-update graph when evidence finishes processing
+  const wasProcessing = useRef<boolean>(false);
+  const isPolling = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (!activeCaseId) return;
+
+    let intervalId: NodeJS.Timeout;
+    
+    const checkProcessingStatus = async () => {
+      if (isPolling.current) return;
+      isPolling.current = true;
+      
+      const token = getToken();
+      if (!token) {
+        isPolling.current = false;
+        return;
+      }
+      
+      try {
+        const res = await fetch(getApiUrl(`/api/evidence/?case_id=${activeCaseId}`), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const evidenceList = await res.json();
+          const processingCount = evidenceList.filter((e: any) => e.processing_status === "PROCESSING").length;
+          
+          if (processingCount > 0) {
+            wasProcessing.current = true;
+          } else if (processingCount === 0 && wasProcessing.current) {
+            // Processing just finished! Fetch the new network data without clearing the old data.
+            wasProcessing.current = false;
+            fetchGraphData(activeCaseId);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check evidence processing status:", err);
+      } finally {
+        isPolling.current = false;
+      }
+    };
+
+    // Reset processing tracker when the active case changes to prevent cross-case false positives
+    wasProcessing.current = false;
+    isPolling.current = false;
+
+    // Start polling every 3 seconds to check for processing updates
+    intervalId = setInterval(checkProcessingStatus, 3000);
+    
+    // Perform an initial check just in case evidence is already processing when component mounts
+    checkProcessingStatus();
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [activeCaseId, fetchGraphData, getToken]);
 
 
 
