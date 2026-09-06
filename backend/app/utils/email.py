@@ -18,6 +18,8 @@ def send_reset_otp_email(to_email: str, otp: str):
     from_name = os.getenv("SMTP_FROM_NAME", "NEXUS")
 
     if not all([smtp_host, smtp_port, smtp_user, smtp_pass]):
+        import sys
+        print(f"SMTP CONFIG MISSING: host={bool(smtp_host)}, port={bool(smtp_port)}, user={bool(smtp_user)}, pass={bool(smtp_pass)}", file=sys.stderr)
         logger.error("SMTP credentials are not fully configured.")
         return False
 
@@ -47,8 +49,11 @@ For security reasons, do not share this OTP with anyone.
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
         server.quit()
+        import sys
+        print(f"SUCCESS: Email sent to {to_email}", file=sys.stderr)
         return True
     except Exception as e:
+        import sys
+        print(f"SMTP ERROR for {to_email}: {e}", file=sys.stderr)
         logger.error(f"Failed to send email via SMTP. Check credentials and network. Error logged securely.")
-        # DO NOT LOG SMTP CREDENTIALS or FULL EXCEPTION TRACE if it might leak things.
         return False
