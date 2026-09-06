@@ -61,7 +61,9 @@ const NetworkNode = React.memo(function NetworkNode({
   secondaryEntities,
   avatar,
   isModalOpen = false,
-  theme
+  theme,
+  isSelected = false,
+  isConnected = false,
 }: {
   position: [number, number, number];
   color: string;
@@ -78,12 +80,16 @@ const NetworkNode = React.memo(function NetworkNode({
   avatar?: string;
   isModalOpen?: boolean;
   theme?: string;
+  isSelected?: boolean;
+  isConnected?: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const ringRef1 = useRef<THREE.Mesh>(null);
+  const ringRef2 = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
   const isSuspicious = riskScore > 0.6 || type === "ALERT" || type === "HIGH_RISK";
-  const baseSize = isSuspicious ? 1.15 : 0.75;
+  const baseSize = isSelected ? 1.6 : isConnected ? 1.05 : isSuspicious ? 1.15 : 0.75;
   const size = hovered ? baseSize * 1.25 : baseSize;
 
   useEffect(() => {
@@ -95,7 +101,16 @@ const NetworkNode = React.memo(function NetworkNode({
   useFrame((state) => {
     if (!meshRef.current) return;
     meshRef.current.rotation.y = state.clock.getElapsedTime() * 0.25;
-    if (isSuspicious) {
+    if (isSelected) {
+      const pulse = 1 + Math.sin(state.clock.getElapsedTime() * 4) * 0.1;
+      meshRef.current.scale.setScalar(pulse);
+      if (ringRef1.current) {
+        ringRef1.current.rotation.z = state.clock.getElapsedTime() * 0.8;
+      }
+      if (ringRef2.current) {
+        ringRef2.current.rotation.y = state.clock.getElapsedTime() * -0.6;
+      }
+    } else if (isSuspicious) {
       const pulse = 1 + Math.sin(state.clock.getElapsedTime() * 3.5) * 0.06;
       meshRef.current.scale.setScalar(pulse);
     }
@@ -108,7 +123,7 @@ const NetworkNode = React.memo(function NetworkNode({
     };
   }, [hovered, isEditMode, isModalOpen]);
 
-  const opacity = dimmed ? 0.18 : 1;
+  const opacity = isSelected ? 1 : isConnected ? 0.88 : dimmed ? 0.25 : 1;
 
   const nodeContent = (
     <group
@@ -142,36 +157,58 @@ const NetworkNode = React.memo(function NetworkNode({
           <sphereGeometry args={[size, 24, 24]} />
         )}
         <meshStandardMaterial
-          color={color}
+          color={isSelected ? "#dc2626" : color}
           roughness={0.25}
           metalness={0.7}
-          emissive={highlighted || isSuspicious ? color : "#000000"}
-          emissiveIntensity={highlighted ? 0.85 : hovered ? 0.55 : isSuspicious ? 0.35 : 0.08}
+          emissive={isSelected ? "#ff2222" : highlighted || isSuspicious ? color : "#000000"}
+          emissiveIntensity={isSelected ? 1.0 : highlighted ? 0.85 : hovered ? 0.55 : isSuspicious ? 0.35 : 0.08}
           transparent
-          opacity={opacity * 0.8}
+          opacity={opacity * 0.85}
         />
       </mesh>
 
       {/* HTML Billboard for Icon / Avatar */}
-      <Html center style={{ pointerEvents: 'none', zIndex: 0 }} zIndexRange={[0, 0]}>
+      <Html center style={{ pointerEvents: 'none', zIndex: isSelected ? 10 : 0 }} zIndexRange={isSelected ? [10, 10] : [0, 0]}>
         <div 
-          className={`flex items-center justify-center rounded-full overflow-hidden transition-all duration-300 ${dimmed && !hovered ? 'opacity-20' : 'opacity-100'}`}
+          className={`flex items-center justify-center rounded-full overflow-hidden transition-all duration-300 ${dimmed && !hovered && !isConnected && !isSelected ? 'opacity-25' : 'opacity-100'}`}
           style={{ 
             width: `${size * 32}px`, 
             height: `${size * 32}px`,
-            backgroundColor: avatar ? 'transparent' : 'rgba(0,0,0,0.6)',
-            border: highlighted ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.1)'
+            backgroundColor: avatar ? 'transparent' : isSelected ? 'rgba(69,10,10,0.85)' : 'rgba(0,0,0,0.6)',
+            border: isSelected ? '3px solid #ff3b3b' : highlighted ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.1)',
+            boxShadow: isSelected ? '0 0 25px rgba(255,59,59,0.9), 0 0 10px rgba(255,107,0,0.6)' : undefined,
           }}
         >
           {avatar && avatar !== "null" && avatar !== "undefined" && !imgError ? (
             <img src={avatar} alt={name} className="w-full h-full object-cover" onError={() => setImgError(true)} />
           ) : (
-            <FontAwesomeIcon icon={getIconForType(type)} className="text-white drop-shadow-md" style={{ fontSize: `${size * 14}px`, color: theme === 'light' ? '#0F172A' : '#ffffff' }} />
+            <FontAwesomeIcon icon={getIconForType(type)} className="text-white drop-shadow-md" style={{ fontSize: `${size * 14}px`, color: isSelected ? '#ffffff' : theme === 'light' ? '#0F172A' : '#ffffff' }} />
           )}
         </div>
       </Html>
 
-      {(isSuspicious || highlighted) && (
+      {isSelected && (
+        <>
+          <mesh ref={ringRef1} rotation-x={Math.PI / 2}>
+            <torusGeometry args={[size * 1.9, 0.08, 16, 100]} />
+            <meshBasicMaterial
+              color="#ff3b3b"
+              transparent
+              opacity={0.9}
+            />
+          </mesh>
+          <mesh ref={ringRef2} rotation-z={Math.PI / 4} rotation-x={Math.PI / 3}>
+            <torusGeometry args={[size * 2.2, 0.05, 16, 100]} />
+            <meshBasicMaterial
+              color="#ff7700"
+              transparent
+              opacity={0.7}
+            />
+          </mesh>
+        </>
+      )}
+
+      {!isSelected && (isSuspicious || highlighted) && (
         <mesh rotation-x={Math.PI / 2}>
           <torusGeometry args={[size * 1.8, 0.05, 16, 100]} />
           <meshBasicMaterial
@@ -181,18 +218,33 @@ const NetworkNode = React.memo(function NetworkNode({
           />
         </mesh>
       )}
-      {(!dimmed || hovered) && (
-        <Text
-          position={[0, baseSize + 0.7, 0]}
-          fontSize={0.42}
-          color={hovered ? (theme === 'light' ? "#0284c7" : "#93c5fd") : highlighted ? (theme === 'light' ? "#0f172a" : "#ffffff") : (theme === 'light' ? "#1e293b" : "#e2e8f0")}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.02}
-          outlineColor={theme === 'light' ? "#ffffff" : "#020617"}
-        >
-          {name}
-        </Text>
+
+      {(!dimmed || hovered || isConnected || isSelected) && (
+        <group position={[0, baseSize + (isSelected ? 1.0 : 0.7), 0]}>
+          <Text
+            fontSize={isSelected ? 0.6 : 0.42}
+            color={isSelected ? "#ff3b3b" : isConnected ? (theme === 'light' ? "#0f172a" : "#f1f5f9") : hovered ? (theme === 'light' ? "#0284c7" : "#93c5fd") : highlighted ? (theme === 'light' ? "#0f172a" : "#ffffff") : (theme === 'light' ? "#1e293b" : "#e2e8f0")}
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={isSelected ? 0.04 : 0.02}
+            outlineColor={theme === 'light' ? "#ffffff" : "#020617"}
+          >
+            {name}
+          </Text>
+          {isSelected && (
+            <Text
+              position={[0, -0.45, 0]}
+              fontSize={0.26}
+              color="#ffaa00"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.025}
+              outlineColor="#020617"
+            >
+              ★ SELECTED ANOMALY ★
+            </Text>
+          )}
+        </group>
       )}
       
       {hovered && !isModalOpen && (
@@ -275,6 +327,7 @@ const NetworkEdge = React.memo(function NetworkEdge({
   onClick,
   isModalOpen = false,
   theme,
+  isSelectedConnection = false,
 }: {
   start: THREE.Vector3;
   end: THREE.Vector3;
@@ -284,6 +337,7 @@ const NetworkEdge = React.memo(function NetworkEdge({
   onClick?: () => void;
   isModalOpen?: boolean;
   theme?: string;
+  isSelectedConnection?: boolean;
 }) {
   const midPoint = useMemo(
     () => new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5),
@@ -306,13 +360,17 @@ const NetworkEdge = React.memo(function NetworkEdge({
     return q;
   }, [dir]);
 
-  const color = highlighted 
-    ? (theme === 'light' ? "#2563eb" : "#60a5fa") 
-    : dimmed 
-      ? (theme === 'light' ? "#64748b" : "#334155") 
-      : (theme === 'light' ? "#1F2933" : "#94a3b8");
+  const color = isSelectedConnection
+    ? "#ff3b3b"
+    : highlighted 
+      ? (theme === 'light' ? "#2563eb" : "#60a5fa") 
+      : dimmed 
+        ? (theme === 'light' ? "#64748b" : "#334155") 
+        : (theme === 'light' ? "#1F2933" : "#94a3b8");
       
-  const opacity = highlighted ? 1 : dimmed ? (theme === 'light' ? 0.35 : 0.12) : (theme === 'light' ? 0.8 : 0.55);
+  const opacity = isSelectedConnection
+    ? 1
+    : highlighted ? 1 : dimmed ? (theme === 'light' ? 0.35 : 0.15) : (theme === 'light' ? 0.8 : 0.55);
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
@@ -332,23 +390,23 @@ const NetworkEdge = React.memo(function NetworkEdge({
     >
       {length > 0 && (
         <mesh position={midPoint} quaternion={quaternion}>
-          <cylinderGeometry args={[highlighted ? 0.08 : 0.04, highlighted ? 0.08 : 0.04, length, 8]} />
+          <cylinderGeometry args={[isSelectedConnection ? 0.12 : highlighted ? 0.08 : 0.04, isSelectedConnection ? 0.12 : highlighted ? 0.08 : 0.04, length, 8]} />
           <meshBasicMaterial color={hovered ? "#ffffff" : color} transparent opacity={opacity} />
         </mesh>
       )}
 
       <mesh position={arrowPos} quaternion={quaternion}>
-        <coneGeometry args={[0.2, 0.6, 8]} />
+        <coneGeometry args={[isSelectedConnection ? 0.32 : 0.2, isSelectedConnection ? 0.8 : 0.6, 8]} />
         <meshBasicMaterial color={hovered ? "#ffffff" : color} transparent opacity={opacity} />
       </mesh>
-      {(!dimmed || highlighted) && (
+      {(!dimmed || highlighted || isSelectedConnection) && (
         <Text
-          position={[midPoint.x, midPoint.y + 0.35, midPoint.z]}
-          fontSize={0.28}
-          color={color}
+          position={[midPoint.x, midPoint.y + (isSelectedConnection ? 0.45 : 0.35), midPoint.z]}
+          fontSize={isSelectedConnection ? 0.36 : 0.28}
+          color={isSelectedConnection ? "#ff5555" : color}
           anchorX="center"
           anchorY="middle"
-          outlineWidth={0.015}
+          outlineWidth={isSelectedConnection ? 0.025 : 0.015}
           outlineColor={theme === 'light' ? "#ffffff" : "#020617"}
         >
           {label}
@@ -358,9 +416,20 @@ const NetworkEdge = React.memo(function NetworkEdge({
   );
 });
 
-function CameraController() {
+function CameraController({ targetPosition }: { targetPosition?: [number, number, number] | null }) {
   const { camera, controls } = useThree();
-  
+  const targetVec = useRef<THREE.Vector3 | null>(null);
+  const targetCamPos = useRef<THREE.Vector3 | null>(null);
+  const isTransitioning = useRef(false);
+
+  useEffect(() => {
+    if (targetPosition) {
+      targetVec.current = new THREE.Vector3(targetPosition[0], targetPosition[1], targetPosition[2]);
+      targetCamPos.current = new THREE.Vector3(targetPosition[0], targetPosition[1] + 2, targetPosition[2] + 12);
+      isTransitioning.current = true;
+    }
+  }, [targetPosition]);
+
   useEffect(() => {
     const handleZoomIn = () => {
       camera.position.z = Math.max(8, camera.position.z - 4);
@@ -373,21 +442,17 @@ function CameraController() {
       camera.updateProjectionMatrix();
     };
     const handleReset = () => {
-      camera.position.set(0, 4, 38);
-      camera.lookAt(0, 0, 0);
-      camera.updateProjectionMatrix();
-      if (controls && (controls as any).target) {
-        (controls as any).target.set(0, 0, 0);
-      }
+      targetVec.current = new THREE.Vector3(0, 0, 0);
+      targetCamPos.current = new THREE.Vector3(0, 4, 38);
+      isTransitioning.current = true;
     };
     
     const handleFocus = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail && controls && (controls as any).target) {
-        (controls as any).target.set(detail.x, detail.y, detail.z);
-        // Position camera slightly offset from the node for a nice focus view
-        camera.position.set(detail.x, detail.y + 2, detail.z + 10);
-        camera.updateProjectionMatrix();
+      if (detail) {
+        targetVec.current = new THREE.Vector3(detail.x, detail.y, detail.z);
+        targetCamPos.current = new THREE.Vector3(detail.x, detail.y + 2, detail.z + 12);
+        isTransitioning.current = true;
       }
     };
     
@@ -401,7 +466,21 @@ function CameraController() {
       window.removeEventListener('network:reset', handleReset);
       window.removeEventListener('network:focus', handleFocus);
     };
-  }, [camera, controls]);
+  }, [camera]);
+
+  useFrame(() => {
+    if (!isTransitioning.current || !targetVec.current || !targetCamPos.current) return;
+    
+    if (controls && (controls as any).target) {
+      (controls as any).target.lerp(targetVec.current, 0.08);
+    }
+    camera.position.lerp(targetCamPos.current, 0.08);
+    camera.updateProjectionMatrix();
+
+    if (camera.position.distanceTo(targetCamPos.current) < 0.05) {
+      isTransitioning.current = false;
+    }
+  });
 
   return null;
 }
@@ -411,6 +490,7 @@ export default function NetworkScene({
   onNodeClick,
   onEdgeClick,
   highlightedPath = [],
+  selectedNodeId = null,
   isEditMode = false,
   onNodeDragEnd,
   draggedPositions = {},
@@ -420,6 +500,7 @@ export default function NetworkScene({
   onNodeClick?: (node: any) => void;
   onEdgeClick?: (edge: any) => void;
   highlightedPath?: string[];
+  selectedNodeId?: string | null;
   isEditMode?: boolean;
   onNodeDragEnd?: (id: string, x: number, y: number, z: number) => void;
   draggedPositions?: Record<string, {x: number, y: number, z: number}>;
@@ -483,8 +564,6 @@ export default function NetworkScene({
       return bestPrimary;
     };
 
-    const secondaryOffsets = new Map<string, number>();
-
     for (let i = 0; i < secondaryNodes.length; i++) {
       const node = secondaryNodes[i];
       const idStr = String(node.id ?? node._id ?? (primaryNodes.length + i));
@@ -498,9 +577,6 @@ export default function NetworkScene({
         if (parentPrimary) {
            parentPrimary.secondaryEntities = parentPrimary.secondaryEntities || [];
            parentPrimary.secondaryEntities.push(node);
-        } else {
-           // If unlinked, we can just hide it or still render it since there's no primary to attach to.
-           // Hiding it by NOT pushing to finalNodes is safer to avoid clutter.
         }
       }
     }
@@ -512,6 +588,36 @@ export default function NetworkScene({
     for (const node of nodes) map.set(node.id, node);
     return map;
   }, [nodes]);
+
+  const { connectedNodeIds, connectedEdgeIds } = useMemo(() => {
+    if (!selectedNodeId) {
+      return { connectedNodeIds: new Set<string>(), connectedEdgeIds: new Set<string>() };
+    }
+    const nodeSet = new Set<string>();
+    const edgeSet = new Set<string>();
+    const rawLinks = data?.links || data?.edges || [];
+
+    rawLinks.forEach((link: any, index: number) => {
+      const s = linkEndpointId(link.source);
+      const t = linkEndpointId(link.target);
+      const edgeId = String(link.rel_id || link.id || `${s}-${t}-${index}`);
+
+      if (s === String(selectedNodeId)) {
+        nodeSet.add(t);
+        edgeSet.add(edgeId);
+      } else if (t === String(selectedNodeId)) {
+        nodeSet.add(s);
+        edgeSet.add(edgeId);
+      }
+    });
+
+    return { connectedNodeIds: nodeSet, connectedEdgeIds: edgeSet };
+  }, [data, selectedNodeId]);
+
+  const selectedNode = useMemo(() => {
+    if (!selectedNodeId) return null;
+    return nodes.find((n: any) => String(n.id) === String(selectedNodeId)) || null;
+  }, [nodes, selectedNodeId]);
 
   const edges = useMemo(() => {
     const rawLinks = data?.links || data?.edges || [];
@@ -536,8 +642,10 @@ export default function NetworkScene({
           }
         }
 
+        const edgeId = String(link.rel_id || link.id || `${sourceId}-${targetId}-${index}`);
+
         return {
-          id: String(link.rel_id || link.id || `${sourceId}-${targetId}-${index}`),
+          id: edgeId,
           start: new THREE.Vector3(...sourceNode.position),
           end: new THREE.Vector3(...targetNode.position),
           label: link.type || "LINKED",
@@ -571,7 +679,7 @@ export default function NetworkScene({
     }
   };
 
-  const hasHighlight = highlightedPath.length > 0;
+  const hasHighlight = (highlightedPath && highlightedPath.length > 0) || Boolean(selectedNodeId);
 
   if (!nodes.length) {
     return (
@@ -589,22 +697,36 @@ export default function NetworkScene({
         <pointLight position={[-40, -20, -40]} intensity={0.45} />
         <directionalLight position={[0, 12, 8]} intensity={0.65} />
 
-        {edges.map((edge: any) => (
-          <NetworkEdge
-            key={edge.id}
-            start={edge.start}
-            end={edge.end}
-            label={edge.label}
-            highlighted={edge.highlighted}
-            dimmed={hasHighlight && !edge.highlighted}
-            onClick={onEdgeClick ? () => onEdgeClick(edge) : undefined}
-            isModalOpen={isModalOpen}
-            theme={theme}
-          />
-        ))}
+        {edges.map((edge: any) => {
+          const isSelectedConnection = Boolean(selectedNodeId) && connectedEdgeIds.has(edge.id);
+          const isDimmed = Boolean(selectedNodeId)
+            ? !isSelectedConnection
+            : hasHighlight && !edge.highlighted;
+
+          return (
+            <NetworkEdge
+              key={edge.id}
+              start={edge.start}
+              end={edge.end}
+              label={edge.label}
+              highlighted={edge.highlighted}
+              isSelectedConnection={isSelectedConnection}
+              dimmed={isDimmed}
+              onClick={onEdgeClick ? () => onEdgeClick(edge) : undefined}
+              isModalOpen={isModalOpen}
+              theme={theme}
+            />
+          );
+        })}
 
         {nodes.map((node: any) => {
+          const isSelected = Boolean(selectedNodeId) && String(node.id) === String(selectedNodeId);
+          const isConnected = Boolean(selectedNodeId) && connectedNodeIds.has(String(node.id));
           const isHighlighted = highlightedPath.map(String).includes(node.id);
+          const isDimmed = Boolean(selectedNodeId)
+            ? !isSelected && !isConnected
+            : hasHighlight && !isHighlighted;
+
           return (
             <NetworkNode
               key={node.id}
@@ -615,8 +737,10 @@ export default function NetworkScene({
               riskScore={node.risk_score || 0}
               color={getColorByType(node.type, node.risk_score || 0)}
               onClick={() => onNodeClick?.(node)}
-              highlighted={isHighlighted}
-              dimmed={hasHighlight && !isHighlighted}
+              highlighted={isHighlighted || isSelected}
+              dimmed={isDimmed}
+              isSelected={isSelected}
+              isConnected={isConnected}
               isEditMode={isEditMode}
               onNodeDragEnd={onNodeDragEnd}
               secondaryEntities={node.secondaryEntities}
@@ -627,7 +751,7 @@ export default function NetworkScene({
           );
         })}
 
-        <CameraController />
+        <CameraController targetPosition={selectedNode ? selectedNode.position : null} />
         <OrbitControls makeDefault enableDamping dampingFactor={0.08} maxDistance={90} minDistance={8} enabled={!isModalOpen} />
       </Canvas>
     </div>

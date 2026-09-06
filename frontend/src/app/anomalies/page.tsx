@@ -1,24 +1,26 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useCase } from "@/context/CaseContext";
-import Link from "next/link";
 import { ReactFlow, MiniMap, Controls, Background, useNodesState, useEdgesState, MarkerType } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 
 export default function AnomaliesDashboard() {
+  const router = useRouter();
   const { activeCaseId, activeCase } = useCase();
 
   const [entities, setEntities] = useState<any[]>([]);
   const [relationships, setRelationships] = useState<any[]>([]);
   const [evidenceList, setEvidenceList] = useState<any[]>([]);
-  
+
   const [anomalies, setAnomalies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"LIST" | "GRAPH">("LIST");
-  
+  const [selectedAnomaly, setSelectedAnomaly] = useState<string | null>(null);
+
   // React Flow state
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState<any>([]);
   const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState<any>([]);
@@ -50,7 +52,7 @@ export default function AnomaliesDashboard() {
       if (entRes.ok) setEntities(await entRes.json());
       if (relRes.ok) setRelationships(await relRes.json());
       if (evRes.ok) setEvidenceList(await evRes.json());
-      
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -63,15 +65,16 @@ export default function AnomaliesDashboard() {
     // Reset anomalies when case changes
     setAnomalies([]);
     setLastScanned(null);
+    setSelectedAnomaly(null);
   }, [fetchCaseData, activeCaseId]);
 
   const runDeterministicScan = () => {
     setScanning(true);
-    
+
     // Simulate scan delay for UX
     setTimeout(() => {
       const results: any[] = [];
-      
+
       // RULE 1: High Centrality (Entity with > 3 relationships)
       const relCounts: Record<string, number> = {};
       relationships.forEach(r => {
@@ -147,32 +150,55 @@ export default function AnomaliesDashboard() {
         if (b.severity === "HIGH" && a.severity !== "HIGH") return 1;
         return 0;
       }));
-      
+
       setLastScanned(new Date().toLocaleString());
       setScanning(false);
-      
+      setSelectedAnomaly(null);
+
       // Build Graph
       buildGraph(results);
     }, 1200);
   };
 
-  const buildGraph = (anomalyResults: any[]) => {
+  const buildGraph = (
+    anomalyResults: any[],
+    selectedEntityId: string | null = null
+  ) => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
     dagreGraph.setGraph({ rankdir: 'TB', ranksep: 100, nodesep: 150 });
 
     const anomalyNames = anomalyResults.map(a => a.entity);
-    const newNodes = entities.map((ent, idx) => {
+    const newNodes = entities.map((ent) => {
       const isAnomaly = anomalyNames.includes(ent.name);
       const isHighRisk = anomalyResults.find(a => a.entity === ent.name && a.severity === "HIGH");
-      
+      const isSelected = selectedEntityId ? ent._id === selectedEntityId : false;
+
       let bgColor = isHighRisk ? "#450a0a" : isAnomaly ? "#422006" : "var(--surface-primary)";
       let borderColor = isHighRisk ? "#ef4444" : isAnomaly ? "#f59e0b" : "var(--border-secondary)";
       let textColor = "var(--text-primary)";
+      let opacity = 1;
+      let boxShadow: string | undefined = undefined;
+      let zIndex = 1;
+
+      if (isSelected) {
+        bgColor = "#450a0a";
+        borderColor = "#ff3b3b";
+        opacity = 1;
+        boxShadow = "0 0 25px rgba(255, 59, 59, 0.9)";
+        zIndex = 10;
+      } else if (selectedEntityId) {
+        if (isAnomaly) {
+          opacity = 0.45;
+        } else {
+          opacity = 0.35;
+        }
+      }
 
       const node = {
         id: ent._id,
         position: { x: 0, y: 0 },
+        zIndex: zIndex,
         data: {
           label: (
             <div className="flex flex-col gap-1 p-2 text-center w-32">
@@ -185,8 +211,12 @@ export default function AnomaliesDashboard() {
         style: {
           background: bgColor,
           color: textColor,
-          border: `2px solid ${borderColor}`,
+          border: isSelected ? "2px solid #ff3b3b" : `2px solid ${borderColor}`,
           borderRadius: '8px',
+          opacity: opacity,
+          boxShadow: boxShadow,
+          zIndex: zIndex,
+          transition: 'all 0.3s ease',
         }
       };
       dagreGraph.setNode(node.id, { width: 140, height: 80 });
@@ -195,13 +225,51 @@ export default function AnomaliesDashboard() {
 
     const newEdges = relationships.map((rel, i) => {
       dagreGraph.setEdge(rel.source_entity_id, rel.target_entity_id);
+
+      const isConnectedToSelected =
+        selectedEntityId &&
+        (
+          rel.source_entity_id === selectedEntityId ||
+          rel.target_entity_id === selectedEntityId
+        );
+
+      let edgeStroke = 'var(--border-secondary)';
+      let edgeWidth = 1;
+      let edgeOpacity = 1;
+      let edgeAnimated = true;
+      let markerColor = 'var(--border-secondary)';
+
+      if (selectedEntityId) {
+        if (isConnectedToSelected) {
+          edgeStroke = '#ff3b3b';
+          edgeWidth = 3;
+          edgeOpacity = 1;
+          edgeAnimated = true;
+          markerColor = '#ff3b3b';
+        } else {
+          edgeStroke = 'var(--border-secondary)';
+          edgeWidth = 1;
+          edgeOpacity = 0.2;
+          edgeAnimated = false;
+          markerColor = 'var(--border-secondary)';
+        }
+      }
+
       return {
         id: `e-${rel.source_entity_id}-${rel.target_entity_id}-${i}`,
         source: rel.source_entity_id,
         target: rel.target_entity_id,
-        animated: true,
-        style: { stroke: 'var(--border-secondary)', strokeWidth: 1 },
-        markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--border-secondary)' },
+        animated: edgeAnimated,
+        style: {
+          stroke: edgeStroke,
+          strokeWidth: edgeWidth,
+          opacity: edgeOpacity,
+          transition: 'all 0.3s ease',
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: markerColor,
+        },
       };
     });
 
@@ -231,7 +299,7 @@ export default function AnomaliesDashboard() {
             Run rule-based checks for high connectivity hubs, isolated clusters, and unmapped locations.
           </p>
         </div>
-        
+
         {lastScanned && (
           <div className="text-[10px] font-mono font-bold text-[var(--text-secondary)] uppercase tracking-wider bg-[var(--surface-secondary)] px-3 py-1.5 rounded-lg border border-[var(--border-primary)] shadow-sm">
             Total Anomalies: <span className="text-[var(--danger)]">{anomalies.length}</span> | Last Scan: {lastScanned}
@@ -251,7 +319,7 @@ export default function AnomaliesDashboard() {
         </div>
       ) : (
         <div className="flex flex-col gap-6 px-2">
-          
+
           {/* Scanning Control Panel */}
           <div className="bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-2xl p-6 shadow-sm">
             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
@@ -272,9 +340,9 @@ export default function AnomaliesDashboard() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="shrink-0 w-full md:w-auto">
-                <button 
+                <button
                   onClick={runDeterministicScan}
                   disabled={scanning}
                   className="w-full md:w-auto px-6 py-4 bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] disabled:opacity-50 text-white font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-3"
@@ -288,26 +356,30 @@ export default function AnomaliesDashboard() {
               </div>
             </div>
           </div>
-          
+
           {lastScanned && anomalies.length > 0 && (
             <div className="flex bg-[var(--surface-primary)] border border-[var(--border-primary)] rounded-lg p-1 w-fit mx-auto mb-2">
               <button
                 onClick={() => setViewMode("LIST")}
-                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                  viewMode === "LIST" 
-                    ? "bg-[var(--accent-primary)] text-white shadow-sm" 
+                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-colors ${viewMode === "LIST"
+                    ? "bg-[var(--accent-primary)] text-white shadow-sm"
                     : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}
+                  }`}
               >
                 <i className="fa-solid fa-list-ul mr-1.5"></i> List View
               </button>
               <button
-                onClick={() => setViewMode("GRAPH")}
-                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-colors ${
-                  viewMode === "GRAPH" 
-                    ? "bg-[var(--accent-primary)] text-white shadow-sm" 
+                onClick={() => {
+                  if (selectedAnomaly) {
+                    setSelectedAnomaly(null);
+                    buildGraph(anomalies, null);
+                  }
+                  setViewMode("GRAPH");
+                }}
+                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-colors ${viewMode === "GRAPH"
+                    ? "bg-[var(--accent-primary)] text-white shadow-sm"
                     : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}
+                  }`}
               >
                 <i className="fa-solid fa-diagram-project mr-1.5"></i> Anomaly Graph
               </button>
@@ -335,14 +407,13 @@ export default function AnomaliesDashboard() {
             <div className="grid grid-cols-1 gap-4">
               {anomalies.map((anom, idx) => (
                 <div key={idx} className="bg-[var(--surface-primary)] border border-[var(--border-primary)] p-5 rounded-2xl shadow-sm hover:border-[var(--border-secondary)] hover:bg-[var(--surface-hover)] transition-all flex flex-col sm:flex-row gap-5 items-start">
-                  
+
                   <div className="flex-1 space-y-3 w-full">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${
-                        anom.severity === "HIGH" ? "bg-[var(--danger)]/10 text-[var(--danger)] border-[var(--danger)]/20 shadow-[0_0_8px_var(--danger)]/20" : 
-                        anom.severity === "MEDIUM" ? "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20" : 
-                        "bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]"
-                      }`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${anom.severity === "HIGH" ? "bg-[var(--danger)]/10 text-[var(--danger)] border-[var(--danger)]/20 shadow-[0_0_8px_var(--danger)]/20" :
+                          anom.severity === "MEDIUM" ? "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20" :
+                            "bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border-[var(--border-primary)]"
+                        }`}>
                         {anom.severity} SEVERITY
                       </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-primary)]">
@@ -354,7 +425,7 @@ export default function AnomaliesDashboard() {
                         })}
                       </span>
                     </div>
-                    
+
                     <div>
                       <h3 className="text-base font-bold text-[var(--text-primary)]">
                         Subject: <span className="px-1 py-0.5 rounded bg-[var(--surface-tertiary)]">{anom.entity}</span>
@@ -363,7 +434,7 @@ export default function AnomaliesDashboard() {
                         {anom.reason}
                       </p>
                     </div>
-                    
+
                     {anom.evidence && anom.evidence.length > 0 && (
                       <div className="pt-2 flex gap-2 flex-wrap border-t border-[var(--border-primary)]">
                         {anom.evidence.map((ev: string, i: number) => (
@@ -374,19 +445,32 @@ export default function AnomaliesDashboard() {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="flex sm:flex-col gap-2 shrink-0 w-full sm:w-auto pt-2 sm:pt-0">
-                    <Link href="/graph" className="flex-1 sm:flex-none text-center px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-bold rounded-lg transition-colors shadow-sm">
+                    <button
+                      onClick={() => {
+                        const selectedEntity = entities.find(
+                          e => e.name === anom.entity || (e.name && anom.entity && e.name.trim().toLowerCase() === anom.entity.trim().toLowerCase())
+                        );
+
+                        if (selectedEntity && selectedEntity._id) {
+                          router.push(`/network?focus=${encodeURIComponent(selectedEntity._id)}`);
+                        } else {
+                          router.push('/network');
+                        }
+                      }}
+                      className="flex-1 sm:flex-none text-center px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white text-xs font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+                    >
                       View in Graph
-                    </Link>
+                    </button>
                   </div>
-                  
+
                 </div>
               ))}
             </div>
           ) : (
             <div className="border border-[var(--border-primary)] bg-[var(--surface-primary)] rounded-2xl relative overflow-hidden shadow-sm h-[600px] w-full">
-              <ReactFlow 
+              <ReactFlow
                 nodes={flowNodes}
                 edges={flowEdges}
                 onNodesChange={onNodesChange}
@@ -397,10 +481,10 @@ export default function AnomaliesDashboard() {
               >
                 <Background color="var(--border-secondary)" gap={20} />
                 <Controls className="bg-[var(--surface-primary)] border-[var(--border-primary)] fill-[var(--text-secondary)]" />
-                <MiniMap 
+                <MiniMap
                   nodeColor={(n) => n.style?.background as string || '#334155'}
                   maskColor="var(--surface-tertiary)"
-                  className="bg-[var(--surface-primary)] border-[var(--border-primary)] opacity-80" 
+                  className="bg-[var(--surface-primary)] border-[var(--border-primary)] opacity-80"
                 />
               </ReactFlow>
             </div>

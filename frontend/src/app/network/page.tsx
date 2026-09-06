@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useCase } from "@/context/CaseContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -10,10 +10,21 @@ import { faFilter, faUser, faBuilding, faMapMarkerAlt, faCar, faFileInvoice, faE
 // Dynamically import the 3D scene to prevent SSR issues with Three.js
 const NetworkScene = dynamic(() => import("../../three/NetworkScene"), { ssr: false });
 
-export default function NetworkPage() {
+function NetworkView() {
   const { cases, activeCaseId, activeCase, refreshCases } = useCase();
   const [graphData, setGraphData] = useState<any>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusParam = searchParams.get("focus");
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(focusParam);
+
+  useEffect(() => {
+    if (focusParam) {
+      setSelectedNodeId(focusParam);
+    }
+  }, [focusParam]);
+
   const [filters, setFilters] = useState({
     person: true,
     organization: true,
@@ -25,7 +36,6 @@ export default function NetworkPage() {
     event: true,
     alerts: true,
   });
-  const router = useRouter();
 
   // API helper
   const getApiUrl = (path: string) => {
@@ -207,6 +217,32 @@ export default function NetworkPage() {
   }, [graphData]);
 
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
+  const selectedNode = React.useMemo(() => {
+    if (!selectedNodeId || !graphData?.nodes) return null;
+    return graphData.nodes.find((n: any) => String(n.id || n._id) === String(selectedNodeId)) || null;
+  }, [selectedNodeId, graphData]);
+
+  // Ensure category filter is enabled for focused entity if selected
+  useEffect(() => {
+    if (selectedNode) {
+      const t = (selectedNode.type || "").toLowerCase();
+      if (t === "person" && !filters.person) setFilters(f => ({ ...f, person: true }));
+      else if (t === "organization" && !filters.organization) setFilters(f => ({ ...f, organization: true }));
+      else if (t === "location" && !filters.location) setFilters(f => ({ ...f, location: true }));
+      else if ((t === "phone" || t === "phone_number" || t === "communication") && !filters.phone) setFilters(f => ({ ...f, phone: true }));
+      else if (t === "vehicle" && !filters.vehicle) setFilters(f => ({ ...f, vehicle: true }));
+      else if (t === "account" && !filters.account) setFilters(f => ({ ...f, account: true }));
+      else if (t === "email" && !filters.email) setFilters(f => ({ ...f, email: true }));
+      else if (t === "event" && !filters.event) setFilters(f => ({ ...f, event: true }));
+    }
+  }, [selectedNode]);
+
+  const handleClearHighlight = useCallback(() => {
+    setSelectedNodeId(null);
+    router.replace("/network", { scroll: false });
+    window.dispatchEvent(new CustomEvent("network:reset"));
+  }, [router]);
+
   const totalFilters = Object.keys(filters).length;
 
   return (
@@ -232,6 +268,36 @@ export default function NetworkPage() {
             Explore entities and relationships in an interactive investigation network.
           </p>
         </div>
+
+        {/* Selected Anomaly Highlight Banner in Sidebar */}
+        {selectedNode && (
+          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 flex flex-col gap-2 shadow-sm animate-fade-in">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                <FontAwesomeIcon icon={faShieldHalved} /> Focused Anomaly
+              </span>
+              <button
+                onClick={handleClearHighlight}
+                className="text-[10px] text-red-400 hover:text-red-300 font-semibold cursor-pointer underline"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="text-sm font-extrabold text-[var(--text-primary)] truncate">
+              {selectedNode.name}
+            </div>
+            <div className="text-[10px] font-mono text-[var(--text-secondary)]">
+              Type: <span className="uppercase text-[var(--text-primary)] font-bold">{selectedNode.type}</span>
+            </div>
+            <button
+              onClick={handleClearHighlight}
+              className="w-full mt-1 py-1.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-95"
+            >
+              <FontAwesomeIcon icon={faRotateRight} className="text-[10px]" />
+              Clear Highlight
+            </button>
+          </div>
+        )}
 
         {/* Category Filters */}
         <div className="flex flex-col gap-3">
@@ -386,7 +452,32 @@ export default function NetworkPage() {
             <span className="text-sm text-[var(--text-secondary)]">Rendering 3D graph structures...</span>
           </div>
         ) : (
-          <NetworkScene data={filteredGraphData} />
+          <>
+            <NetworkScene 
+              data={filteredGraphData} 
+              selectedNodeId={selectedNodeId}
+              onNodeClick={(node: any) => {
+                setSelectedNodeId(String(node.id || node._id));
+              }}
+            />
+            {selectedNode && (
+              <div className="absolute top-6 left-6 z-20 flex items-center gap-3 bg-[var(--surface-primary)]/95 backdrop-blur-md border border-red-500/40 rounded-xl px-4 py-2.5 shadow-2xl animate-fade-in">
+                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_#ef4444]" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-mono text-red-400 font-bold uppercase tracking-wider">Focused Entity</span>
+                  <span className="text-xs font-extrabold text-[var(--text-primary)]">{selectedNode.name || selectedNode.id}</span>
+                </div>
+                <button
+                  onClick={handleClearHighlight}
+                  className="ml-2 px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                  title="Clear Highlight and restore full graph"
+                >
+                  <FontAwesomeIcon icon={faRotateRight} className="text-[10px]" />
+                  Clear Highlight
+                </button>
+              </div>
+            )}
+          </>
         )}
         
         {/* Overlay Stats Card */}
@@ -407,5 +498,17 @@ export default function NetworkPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function NetworkPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex h-full w-full items-center justify-center bg-[var(--app-background)] text-[var(--text-secondary)]">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[var(--primary-accent)]"></div>
+      </div>
+    }>
+      <NetworkView />
+    </React.Suspense>
   );
 }

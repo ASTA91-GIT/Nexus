@@ -23,6 +23,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV HOSTNAME="0.0.0.0"
+ENV PORT=3000
 
 # Copy built artifacts and dependencies from the builder stage
 COPY --from=builder /app/package*.json ./
