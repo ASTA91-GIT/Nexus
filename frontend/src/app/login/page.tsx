@@ -432,10 +432,10 @@ export default function Login() {
                   </div>
                 </div>
 
-                <div className="flex justify-end mt-[-8px]">
-                  <Link href="/forgot-password" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors uppercase font-bold tracking-wider">
+                <div className="flex justify-end pt-1">
+                  <button type="button" onClick={() => router.push("/forgot-password")} className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors uppercase font-bold tracking-wider relative z-10 cursor-pointer">
                     Forgot Password?
-                  </Link>
+                  </button>
                 </div>
               </>
             )}

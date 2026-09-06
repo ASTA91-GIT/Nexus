@@ -32,5 +32,19 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class VerifyOTPRequest(BaseModel):
+    email: str
+    otp: str
+
+class ResendOTPRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    reset_token: str
+    new_password: str
+
 class TokenData(BaseModel):
     email: Optional[str] = None

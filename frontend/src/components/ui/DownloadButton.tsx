@@ -25,13 +25,7 @@ export default function DownloadButton({ as, className = "", onClick, ...props }
         aria-label="Download"
         {...props}
       >
-        <div className="absolute flex flex-col items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:translate-y-[24px]">
-          {/* Arrow sliding in from top */}
-          <svg className="w-5 h-5 absolute -top-[24px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          
-          {/* Default arrow */}
+        <div className="absolute flex flex-col items-center justify-center transition-transform duration-300 ease-out group-hover:translate-y-[2px]">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>

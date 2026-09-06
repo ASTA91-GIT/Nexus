@@ -42,9 +42,11 @@ export function CaseProvider({ children }: { children: React.ReactNode }) {
   const refreshCases = useCallback(async () => {
     if (isRefreshing.current) return;
     
+    const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/verify-otp", "/reset-password"];
+    
     const token = localStorage.getItem("token");
     if (!token) {
-      if (pathname !== "/login" && pathname !== "/") {
+      if (!PUBLIC_PATHS.includes(pathname)) {
         router.push("/login");
       }
       setLoadingCases(false);
@@ -132,7 +134,8 @@ export function CaseProvider({ children }: { children: React.ReactNode }) {
 
 
   useEffect(() => {
-    if (pathname !== "/login" && pathname !== "/") {
+    const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/verify-otp", "/reset-password"];
+    if (!PUBLIC_PATHS.includes(pathname)) {
       if (cases.length === 0) {
         refreshCases();
       }

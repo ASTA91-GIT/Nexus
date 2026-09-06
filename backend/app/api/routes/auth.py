@@ -130,3 +130,163 @@ async def remove_avatar(current_user=Depends(get_current_user), db=Depends(get_d
         {"$unset": {"avatar": ""}}
     )
     return {"message": "Avatar removed successfully"}
+
+import secrets
+import hashlib
+from datetime import datetime, timedelta
+from app.utils.email import send_reset_otp_email
+from app.schemas.auth import ForgotPasswordRequest, VerifyOTPRequest, ResendOTPRequest, ResetPasswordRequest
+
+def generate_secure_otp():
+    return "".join(str(secrets.randbelow(10)) for _ in range(6))
+
+def get_otp_hash(otp: str):
+    return hashlib.sha256(otp.encode('utf-8')).hexdigest()
+
+def get_reset_token_hash(token: str):
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, db=Depends(get_database)):
+    generic_msg = {"message": "If the email is registered, a verification OTP has been sent."}
+    
+    user = await db["users"].find_one({"email": req.email})
+    if not user:
+        return generic_msg
+        
+    last_otp = await db["password_reset_otps"].find_one(
+        {"email": req.email},
+        sort=[("created_at", -1)]
+    )
+    
+    if last_otp and (datetime.utcnow() - last_otp.get("created_at", datetime.min)) < timedelta(seconds=60):
+        return generic_msg
+        
+    otp = generate_secure_otp()
+    otp_hash = get_otp_hash(otp)
+    
+    await db["password_reset_otps"].delete_many({"email": req.email})
+    
+    await db["password_reset_otps"].insert_one({
+        "user_id": user["_id"],
+        "email": req.email,
+        "otp_hash": otp_hash,
+        "expires_at": datetime.utcnow() + timedelta(minutes=10),
+        "attempts": 0,
+        "verified": False,
+        "used": False,
+        "created_at": datetime.utcnow()
+    })
+    
+    try:
+        send_reset_otp_email(req.email, otp)
+    except Exception as e:
+        logging.error("Failed to send reset OTP email.")
+    return generic_msg
+
+@router.post("/resend-reset-otp")
+async def resend_reset_otp(req: ResendOTPRequest, db=Depends(get_database)):
+    generic_msg = {"message": "If the email is registered and eligible, a new OTP has been sent."}
+    
+    user = await db["users"].find_one({"email": req.email})
+    if not user:
+        return generic_msg
+        
+    last_otp = await db["password_reset_otps"].find_one(
+        {"email": req.email},
+        sort=[("created_at", -1)]
+    )
+    if last_otp and (datetime.utcnow() - last_otp.get("created_at", datetime.min)) < timedelta(seconds=60):
+        return generic_msg
+        
+    otp = generate_secure_otp()
+    otp_hash = get_otp_hash(otp)
+    
+    await db["password_reset_otps"].delete_many({"email": req.email})
+    
+    await db["password_reset_otps"].insert_one({
+        "user_id": user["_id"],
+        "email": req.email,
+        "otp_hash": otp_hash,
+        "expires_at": datetime.utcnow() + timedelta(minutes=10),
+        "attempts": 0,
+        "verified": False,
+        "used": False,
+        "created_at": datetime.utcnow()
+    })
+    
+    try:
+        send_reset_otp_email(req.email, otp)
+    except Exception as e:
+        logging.error("Failed to send reset OTP email.")
+    return generic_msg
+
+@router.post("/verify-reset-otp")
+async def verify_reset_otp(req: VerifyOTPRequest, db=Depends(get_database)):
+    record = await db["password_reset_otps"].find_one({"email": req.email})
+    
+    if not record:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP.")
+        
+    if record.get("verified"):
+        raise HTTPException(status_code=400, detail="OTP has already been used.")
+        
+    if record.get("attempts", 0) >= 5:
+        await db["password_reset_otps"].delete_many({"email": req.email})
+        raise HTTPException(status_code=400, detail="Too many incorrect attempts. Please request a new OTP.")
+        
+    if record["expires_at"] < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP.")
+        
+    otp_hash = get_otp_hash(req.otp)
+    if record["otp_hash"] != otp_hash:
+        await db["password_reset_otps"].update_one(
+            {"_id": record["_id"]},
+            {"$inc": {"attempts": 1}}
+        )
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP.")
+        
+    await db["password_reset_otps"].update_one(
+        {"_id": record["_id"]},
+        {"$set": {"verified": True}}
+    )
+    
+    reset_token = secrets.token_urlsafe(32)
+    token_hash = get_reset_token_hash(reset_token)
+    
+    await db["password_reset_tokens"].delete_many({"email": req.email})
+    await db["password_reset_tokens"].insert_one({
+        "user_id": record.get("user_id"),
+        "email": req.email,
+        "token_hash": token_hash,
+        "expires_at": datetime.utcnow() + timedelta(minutes=15)
+    })
+    
+    return {"message": "OTP verified successfully.", "reset_token": reset_token}
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest, db=Depends(get_database)):
+    token_hash = get_reset_token_hash(req.reset_token)
+    token_record = await db["password_reset_tokens"].find_one({"token_hash": token_hash})
+    
+    if not token_record or token_record["expires_at"] < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired reset session.")
+        
+    email = token_record["email"]
+    
+    is_valid, msg = validate_password(req.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=msg)
+        
+    new_hashed_password = get_password_hash(req.new_password)
+    
+    await db["users"].update_one(
+        {"email": email},
+        {"$set": {"hashed_password": new_hashed_password}}
+    )
+    
+    await db["password_reset_tokens"].delete_many({"email": email})
+    await db["password_reset_otps"].delete_many({"email": email})
+    
+    return {"message": "Password has been updated successfully."}
+
