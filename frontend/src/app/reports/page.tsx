@@ -89,7 +89,7 @@ export default function ReportsPage() {
           </button>
           {reportData && typeof window !== "undefined" && (
             <PDFDownloadLink
-              document={<CaseReportPDF caseData={activeCase} entities={entities} relationships={relationships} evidence={evidenceList} />}
+              document={<CaseReportPDF caseData={activeCase} entities={entities} relationships={relationships} evidence={evidenceList} reportData={reportData} />}
               fileName={`NEXUS_Report_${activeCase?.name.replace(/\s+/g, '_')}.pdf`}
               className="inline-block"
             >

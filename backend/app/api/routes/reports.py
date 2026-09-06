@@ -28,16 +28,19 @@ async def generate_report(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    # Handle variation in case ID storage
+    query = {"$or": [{"case_id": case_id}, {"caseId": case_id}]}
+    
     # Fetch entities
-    cursor = db["entities"].find({"case_id": case_id})
+    cursor = db["entities"].find(query)
     entities = await cursor.to_list(length=1000)
     
     # Fetch relationships
-    rel_cursor = db["relationships"].find({"case_id": case_id})
+    rel_cursor = db["relationships"].find(query)
     relationships = await rel_cursor.to_list(length=1000)
     
     # Fetch evidence
-    ev_cursor = db["evidence"].find({"case_id": case_id})
+    ev_cursor = db["evidence"].find(query)
     evidence = await ev_cursor.to_list(length=100)
     
     # Section 1 & 4: Entities
@@ -60,10 +63,18 @@ async def generate_report(
         rtype = r.get("type", "UNKNOWN")
         relationship_types[rtype] = relationship_types.get(rtype, 0) + 1
         
-    important_relationships = [
-        {"source": r.get("source"), "target": r.get("target"), "type": r.get("type")}
-        for r in relationships[:20] # Sample up to 20 for the report
-    ]
+    entity_map = {str(e["_id"]): e.get("name") for e in entities}
+    important_relationships = []
+    for r in relationships[:20]:
+        src_id = str(r.get("source_entity_id", ""))
+        tgt_id = str(r.get("target_entity_id", ""))
+        src_name = entity_map.get(src_id, src_id if src_id and src_id != 'None' else "Unknown")
+        tgt_name = entity_map.get(tgt_id, tgt_id if tgt_id and tgt_id != 'None' else "Unknown")
+        important_relationships.append({
+            "source": src_name,
+            "target": tgt_name,
+            "type": r.get("type", "UNKNOWN")
+        })
 
     # Section 7: Timeline Events
     timeline_events = [
@@ -136,30 +147,93 @@ async def generate_report(
         "relationship_analysis": {
             "important_relationships": important_relationships
         },
-        "ai_insights": "Insufficient data for insights.",
-        "executive_summary": "Insufficient data to generate executive summary.",
-        "recommendations": "No recommendations available."
+        "ai_assessment": {
+            "overall_assessment": "Insufficient data to generate assessment.",
+            "key_findings": [],
+            "network_assessment": "No network assessment available.",
+            "risk_assessment": "No risk assessment available.",
+            "geographic_timeline_observations": "No geographic/timeline information available.",
+            "investigative_leads": []
+        }
     }
 
     # Generate AI insights based on factual data
-    context = f"Case: {case.get('name')}. Desc: {case.get('description')}. Entities: {len(entities)}. High Risk: {len(high_risk_entities)}. Relationships: {len(relationships)}. Top Entities: {json.dumps([e['name'] for e in high_risk_entities])}"
+    context = (
+        f"Case: {case.get('name', 'Unknown')}. Desc: {case.get('description', 'No description')}.\n"
+        f"Metrics: {len(entities)} entities, {len(relationships)} relationships, {len(evidence)} evidence files.\n"
+        f"High Risk Entities ({len(high_risk_entities)}): {json.dumps([e['name'] for e in high_risk_entities[:5]])}\n"
+        f"Geographic Locations ({len(geographic_locations)}): {json.dumps([e['name'] for e in geographic_locations[:5]])}\n"
+        f"Timeline Events ({len(timeline_events)}): {json.dumps([e['name'] for e in timeline_events[:5]])}\n"
+        f"Important Relationships ({len(important_relationships)}): {json.dumps([str(r.get('source')) + ' ' + str(r.get('type')) + ' ' + str(r.get('target')) for r in important_relationships[:5]])}\n"
+    )
     
-    prompt = f"Analyze the following factual case data and generate a short, professional executive summary, some key investigation insights, and actionable investigation recommendations. Ground your response strictly in the provided data. DO NOT hallucinate. Do not invent names, crimes, or facts.\n\nData:\n{context}\n\nFormat your response EXACTLY as JSON with keys 'executive_summary' (string), 'investigation_insights' (string), and 'recommendations' (string)."
+    prompt = f"""Analyze the following factual case data and generate a professional AI Investigative Assessment.
+Ground your response strictly in the provided data. DO NOT hallucinate. 
+Never fabricate: people, organizations, accounts, transactions, relationships, locations, dates, evidence, criminal activity, investigative findings.
+The AI must reason ONLY from this case context.
+If evidence is 0, explicitly state that no evidence records are available.
+If relationships is 0, explicitly state that no relationship records are available.
+If locations or timeline events are 0, explicitly state that sufficient geographic/timeline information is unavailable.
+Use professional investigative decision-support language (e.g., "The available case data indicates...").
+Never state or imply legal guilt.
+
+Data:
+{context}
+
+Format your response EXACTLY as JSON with the following structure:
+{{
+  "executive_summary": "string",
+  "ai_insights": "string",
+  "recommendations": "string",
+  "overall_assessment": "string",
+  "key_findings": ["string", "string"],
+  "network_assessment": "string",
+  "risk_assessment": "string",
+  "geographic_timeline_observations": "string",
+  "investigative_leads": ["string", "string"]
+}}"""
     
     try:
         # Use a faster, smaller model (7B) for report generation to significantly increase generation speed
         ai_response = call_hf_api("You are an expert investigation assistant.", prompt, model="Qwen/Qwen2.5-7B-Instruct")
-        if ai_response:
-            # clean json
-            ai_response = ai_response.replace("```json", "").replace("```", "").strip()
-            res_dict = json.loads(ai_response)
-            report["executive_summary"] = res_dict.get("executive_summary", "Failed to parse executive summary.")
-            report["ai_insights"] = res_dict.get("investigation_insights", "Failed to parse investigation insights.")
-            report["recommendations"] = res_dict.get("recommendations", "Failed to parse recommendations.")
+        if not ai_response:
+            raise ValueError("AI returned an empty response. Falling back to rule-based summary.")
+            
+        # clean json
+        ai_response = ai_response.replace("```json", "").replace("```", "").strip()
+        # Find the first { and last } to handle extra text from LLM
+        start_idx = ai_response.find("{")
+        end_idx = ai_response.rfind("}")
+        if start_idx != -1 and end_idx != -1:
+            ai_response = ai_response[start_idx:end_idx+1]
+            
+        res_dict = json.loads(ai_response)
+        
+        # Restore backward compatibility fields at the top level
+        report["executive_summary"] = res_dict.get("executive_summary", "Executive summary not available.")
+        report["ai_insights"] = res_dict.get("ai_insights", "AI insights not available.")
+        report["recommendations"] = res_dict.get("recommendations", "Recommendations not available.")
+        
+        report["ai_assessment"] = {
+            "overall_assessment": res_dict.get("overall_assessment", "Failed to parse overall assessment."),
+            "key_findings": res_dict.get("key_findings", []),
+            "network_assessment": res_dict.get("network_assessment", "Failed to parse network assessment."),
+            "risk_assessment": res_dict.get("risk_assessment", "Failed to parse risk assessment."),
+            "geographic_timeline_observations": res_dict.get("geographic_timeline_observations", "Failed to parse observations."),
+            "investigative_leads": res_dict.get("investigative_leads", [])
+        }
     except Exception as e:
         print("AI generation failed or not configured, using fallback:", str(e))
-        report["executive_summary"] = f"This case '{case.get('name')}' contains {len(entities)} extracted entities and {len(relationships)} known relationships based on {len(evidence)} evidence files. {len(high_risk_entities)} entities have been flagged as high risk."
-        report["ai_insights"] = "AI insights could not be generated at this time."
-        report["recommendations"] = "1. Review high-risk entities.\n2. Investigate heavily connected hubs.\n3. Verify geographic coordinates of known locations."
+        report["executive_summary"] = "Fallback executive summary."
+        report["ai_insights"] = "Fallback AI insights."
+        report["recommendations"] = "Fallback recommendations."
+        report["ai_assessment"] = {
+            "overall_assessment": f"This case '{case.get('name')}' contains {len(entities)} extracted entities and {len(relationships)} known relationships based on {len(evidence)} evidence files.",
+            "key_findings": ["Review high-risk entities.", "Investigate heavily connected hubs.", "Verify geographic coordinates of known locations."],
+            "network_assessment": "Fallback network assessment.",
+            "risk_assessment": f"{len(high_risk_entities)} entities have been flagged as high risk.",
+            "geographic_timeline_observations": "Geographic and timeline assessment could not be generated at this time.",
+            "investigative_leads": ["Check evidence files manually."]
+        }
 
     return report

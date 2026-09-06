@@ -1,491 +1,305 @@
 <div align="center">
-  <img src="docs/images/nexus-logo.jpg" width="200" alt="NEXUS Logo" />
 
 # NEXUS
-
-### AI-Powered Intelligence & Investigation Platform
-
-<p><em>Connect data. Discover relationships. Investigate intelligently.</em></p>
-
-<p>
-  <img src="https://img.shields.io/badge/Next.js-black?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB" />
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/AI%20Powered-FF6B6B?style=for-the-badge&logo=openai&logoColor=white" alt="AI Powered" />
-</p>
-
-<img
-  src="https://readme-typing-svg.herokuapp.com?font=Inter&weight=700&size=24&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=850&height=60&lines=NEXUS+-+Intelligence+Without+Blind+Spots;Connect+Entities.+Uncover+Patterns.;Accelerate+Your+Investigations."
-  alt="Typing SVG"
-/>
+## AI-Powered Criminal Network Analysis System
+**Smart India Hackathon 2026**
+**Team: Quantum Coders**
 
 </div>
 
-<br />
+NEXUS is an intelligent investigation platform designed to help investigators analyze complex criminal networks by bringing fragmented case data, entities, relationships, evidence, geographic information, timelines, risk indicators, and AI-assisted investigation into one unified platform.
 
-## 🌟 What is NEXUS?
+By converging disparate data streams into a single pane of glass, NEXUS empowers law enforcement and intelligence analysts to uncover hidden actors, trace illicit financial flows, and detect abnormal behavioral patterns. Connect the data. Understand the network. Accelerate the investigation.
 
-NEXUS is an advanced intelligence and investigation platform designed to help investigators, analysts, and security professionals transform complex data into actionable intelligence.
+Instead of manually cross-referencing spreadsheets and disconnected databases, investigators can leverage NEXUS's interactive network graphs, chronological event timelines, geographic intelligence, and conversational AI investigator to quickly identify investigative leads and transform raw evidence into actionable intelligence.
 
-With powerful visualization, AI-assisted analysis, and evidence processing capabilities, NEXUS helps users:
+## Smart India Hackathon 2026
 
-- **Investigate complex relationships** across large datasets.
-- **Analyze entity networks** to uncover hidden actors and influential connections.
-- **Process evidence** and extract actionable intelligence.
-- **Detect anomalies** and abnormal behavioral patterns.
-- **Identify potential risks** using intelligent analysis.
-- **Explore geographic intelligence** and spatial relationships across cases.
-- **Reconstruct timelines** to understand chronological patterns.
-- **Generate intelligence reports** that are structured, clear, and actionable.
-- **Use AI-assisted investigation** to ask natural language questions and extract grounded insights from case data.
+| Field | Details |
+|---|---|
+| Problem Statement ID | SIH26189 |
+| Problem Statement | AI-Powered Criminal Network Analysis System |
+| Ministry | Ministry of Home Affairs |
+| Division | NCRB Women Safety Division |
+| Category | Software |
+| Theme | Blockchain & Cybersecurity |
+| Team | Quantum Coders |
 
-<br />
+## Problem Statement
 
-<div align="center">
+Modern criminal networks are increasingly sophisticated, leaving behind vast but fragmented trails of data. The key challenges NEXUS addresses include:
+- **Fragmented investigation data** scattered across multiple disconnected systems and file formats.
+- **Complex relationships** between people, organizations, accounts, communications, locations, and evidence that are nearly impossible to track mentally.
+- **Difficulty identifying important connections manually**, leading to missed investigative leads and blind spots.
+- **Difficulty detecting suspicious patterns** and high-risk entities hidden within large datasets.
+- **Difficulty combining geographic and timeline information** to understand the "where" and "when" of criminal activities.
+- **Need for secure, case-level evidence and investigation management** to ensure data integrity and chain of custody.
 
-<img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/master/svgs/solid/network-wired.svg" width="600" height="150" alt="Data Flow Concept" />
+## Proposed Solution
 
-<p><code>DATA ➔ ENTITIES ➔ RELATIONSHIPS ➔ ANALYSIS ➔ INTELLIGENCE</code></p>
+NEXUS provides a unified investigation platform that addresses these challenges through the following capabilities:
 
-</div>
+### Unified Investigation Platform
+A centralized environment for managing investigation cases, where all related entities, relationships, evidence files, and alerts are securely isolated and organized by case.
 
----
+### Network Intelligence
+Visual node-based exploration of entity relationships and criminal networks, allowing analysts to interactively expand connections and uncover hidden organizational structures.
 
-## 🚀 Key Capabilities
+### AI Investigator
+An AI-assisted investigation query system that allows users to ask natural-language questions and obtain insights derived directly from the available case information and evidence text.
 
-| Capability | Description |
-|------------|-------------|
-| 🤖 **AI Investigation** | Ask questions about case data and uncover relationships using AI-assisted analysis. |
-| 🕸 **Network Intelligence** | Explore entity relationships and connection patterns through interactive network visualizations. |
-| 🌍 **Geographic Intelligence** | Analyze location-based intelligence, movement patterns, and geographic relationships. |
-| ⏱ **Timeline Analysis** | Reconstruct events and investigate chronological patterns to identify gaps and critical moments. |
-| 📁 **Evidence Intelligence** | Upload, process, organize, and extract intelligence from investigation evidence. |
-| ⚠️ **Risk Detection** | Identify high-risk entities, suspicious activity, and potential emerging threats. |
-| 📊 **Anomaly Detection** | Detect unusual patterns, abnormal behavior, and hidden investigation signals. |
-| 📄 **Intelligence Reports** | Generate structured intelligence reports and actionable summaries automatically. |
+### Risk & Anomaly Detection
+Automated evaluation of entities and network patterns to flag potential high-risk individuals, abnormal transaction structures, and key alerts for investigator review.
 
----
+### Geographic Intelligence
+Map-based visualization of location data associated with entities and events, enabling analysts to track geographic clusters and spatial relationships.
 
-## 🖥 Platform Preview
+### Timeline Analysis
+Chronological visualization of events and activities, helping investigators reconstruct timelines and identify critical operational sequences.
 
-> *High-resolution screenshots and product walkthroughs can be added below.*
+### Evidence Management
+A secure workspace for uploading, organizing, and processing evidence documents, complete with automated text extraction and entity indexing capabilities.
 
-### 🧠 Intelligence Dashboard
+### Secure Case Management
+Robust JWT-based authentication and strict case-level access controls to ensure that sensitive investigation data is only accessible to authorized users.
 
-A centralized command center providing an overview of active cases, recent intelligence alerts, investigation activity, and system status.
+## Key Features
 
-> 📷 `docs/images/dashboard.png`
+- **Authentication & Authorization**: Secure JWT session handling and protected routes.
+- **Case Management**: Create, select, and manage isolated investigation cases.
+- **Entity & Relationship Management**: Define and track persons, organizations, accounts, and their complex interactions.
+- **Interactive Network Graph**: Visual exploration of networks using React Flow and 3D visualization components.
+- **AI Investigator (Chat)**: Conversational assistant powered by LLM integration (LiteLLM/Hugging Face).
+- **Evidence Management**: Upload and process investigation documents (PDFs, text files).
+- **Geographic/Map Analysis**: Interactive map visualizations using MapLibre and React-Leaflet.
+- **Timeline Analysis**: Chronological event tracking.
+- **Alerts/Anomalies**: Automated risk scoring and anomaly detection based on network topology.
+- **Reports Generation**: Investigation summary reporting.
+- **MongoDB Persistence**: Scalable document-based storage for flexible intelligence data models.
 
----
+## System Workflow
 
-### 🕸 Network Investigation
+1. **Case Creation / Selection**: Investigator creates a new secure workspace or opens an existing case.
+2. **Evidence & Investigation Data Ingestion**: Upload documents, enter structured data, or import data.
+3. **Entity and Relationship Extraction**: System processes evidence to extract text and identify relevant entities.
+4. **Data Normalization & Storage**: Information is stored securely in MongoDB and indexed in ChromaDB.
+5. **Network Construction**: The system builds the interconnected relationship graph.
+6. **Geographic & Timeline Analysis**: Investigators explore the spatial and temporal dimensions of the network.
+7. **AI-Assisted Investigation**: Investigator queries the AI for natural-language insights and path analysis.
+8. **Risk / Anomaly Identification**: The system highlights high-risk nodes and alerts.
+9. **Investigation Reporting**: Findings are compiled into intelligence reports.
 
-Interactive node-based visualizations that allow analysts to explore entity relationships and uncover complex networks.
+## Technical Architecture
 
-> 📷 `docs/images/network-graph.png`
-
----
-
-### 🤖 AI Investigator
-
-A conversational AI assistant that queries case data and provides grounded, contextual insights directly from available evidence.
-
-> 📷 `docs/images/ai-investigator.png`
-
----
-
-### 🌍 Geographic Intelligence
-
-A map-based investigation interface for tracking entities, analyzing locations, and cross-referencing geographic intelligence.
-
-> 📷 `docs/images/geographic-intelligence.png`
-
----
-
-### ⏱ Timeline Analysis
-
-A chronological visualization system for reconstructing event sequences and identifying important gaps or patterns.
-
-> 📷 `docs/images/timeline.png`
-
----
-
-### 📁 Evidence Intelligence
-
-A centralized evidence workspace that transforms raw uploads into organized, searchable intelligence artifacts.
-
-> 📷 `docs/images/evidence-intelligence.png`
-
----
-
-## ⚙️ System Architecture
-
-NEXUS uses a modern architecture designed to handle complex intelligence data, relationships, and investigation workflows.
+NEXUS uses a modern, decoupled architecture designed for performance and flexibility.
 
 ```mermaid
 graph TD
-
-    User([Investigator / Analyst])
-
-    User -->|HTTPS| Frontend[Next.js Frontend]
-
-    Frontend -->|REST API + JWT| Backend[FastAPI Backend]
-
-    Backend -->|Async Database Operations| Database[(MongoDB)]
-
-    Backend -->|AI Processing| AI[AI / Intelligence Services]
-
-    AI -->|Insights| Backend
-
-    Backend -->|Intelligence Data| Frontend
+    User([Investigator]) -->|HTTPS| Frontend[NEXUS Frontend <br/> Next.js, React, Tailwind]
+    Frontend -->|REST API + JWT| Backend[FastAPI Backend <br/> Python]
+    Backend -->|Async DB Ops| DB[(MongoDB)]
+    Backend -->|Vector Search| Chroma[(ChromaDB)]
+    Backend -->|AI / NLP Models| AI[AI Services <br/> HuggingFace, LiteLLM]
 ```
 
-### Architecture Components
+**Technology Stack:**
+- **Frontend**: Next.js, React, TypeScript, Tailwind CSS, Three.js (React Three Fiber), MapLibre, React Flow.
+- **Backend**: FastAPI, Python, Motor (Async MongoDB).
+- **Database & Search**: MongoDB, ChromaDB.
+- **AI & Processing**: LiteLLM, Hugging Face, LangChain components, PyPDF2, PyMuPDF.
 
-- **Frontend** — A responsive interface built with React, Next.js, Tailwind CSS, and Framer Motion.
-- **Backend** — A high-performance Python backend powered by FastAPI for API routing, validation, and intelligence processing.
-- **Database** — MongoDB provides flexible document storage for intelligence entities, relationships, cases, and evidence.
-- **Authentication** — JWT-based authentication ensures secure and stateless user sessions.
-- **Intelligence Services** — Integration with AI models for natural language processing and conversational investigation.
-- **Visualization Components** — Interactive visualizations using React Three Fiber, MapLibre GL, and network graph technologies.
+## Data Model
 
----
+- **Cases**: Isolated investigation workspaces.
+- **Entities**: The core nodes of the investigation (Persons, Organizations, Accounts, Locations).
+- **Relationships**: The directional edges connecting entities (e.g., "OWNS_ACCOUNT", "COMMUNICATED_WITH").
+- **Evidence**: Uploaded files and processed text associated with cases.
+- **Timeline Events**: Time-bound activities linked to entities.
+- **Alerts**: System-generated or manual flags indicating risk or anomalies.
+- **Users**: Authenticated investigators.
+- **Audit Logs**: Records of system actions for accountability.
 
-## 🛠 Technology Stack
+## Network Intelligence
 
-| Layer | Technologies |
-|------|-------------|
-| **Frontend** | Next.js, React, Tailwind CSS, Framer Motion, TypeScript |
-| **Backend** | Python, FastAPI, Pydantic, Uvicorn |
-| **Database** | MongoDB, Motor |
-| **Authentication** | JWT, bcrypt |
-| **Visualization** | React Three Fiber, MapLibre GL, Force-directed Graphs |
-| **AI Integration** | LiteLLM, HuggingFace APIs, Transformers |
+NEXUS represents investigations as interconnected networks. Entities (Persons, Organizations, Financial Accounts, Phone Numbers, Locations) are connected by defined relationships. Investigators can explore these connections visually through the interactive network graph. 
 
----
+*Note: The network intelligence features provide investigative leads and highlight connections based on available data; they do not automatically prove criminal activity.*
 
-## 🔄 Core Investigation Workflow
+## AI Investigator
 
-```mermaid
-sequenceDiagram
+The AI Investigator acts as a force multiplier for analysts:
+- **Natural-Language Queries**: Ask questions about the network and evidence in plain English.
+- **Evidence-Based Responses**: The AI retrieves relevant case context (RAG) to ground its insights.
+- **Network Reasoning**: Assists in explaining paths between entities.
 
-    participant User
-    participant System
-    participant AI
+*Note: AI output is intended solely as investigative assistance and must be verified by authorized investigators.*
 
-    User->>System: Create Investigation Case
-    User->>System: Upload Evidence
+## Geographic & Timeline Intelligence
 
-    System->>System: Process Evidence
-    System->>System: Extract Intelligence
-    System->>System: Create Entities & Relationships
+By combining map-based location investigation with chronological timeline events, NEXUS enables analysts to understand the complex movement, interactions, and event sequences of a criminal network over both space and time.
 
-    User->>System: Investigate Network
-    User->>System: Analyze Geographic Data
-    User->>System: Explore Timeline
+## Evidence Management
 
-    System->>System: Detect Risks & Anomalies
+- **Evidence Upload**: Secure file uploading associated with specific cases.
+- **Supported File Types**: Supports text extraction from PDFs and plain text files.
+- **Text Extraction & Processing**: Automated parsing of document contents using PyPDF2 and PyMuPDF.
+- **Indexing**: Processed text is chunked and embedded into ChromaDB for AI retrieval.
+- **Evidence Organization**: Status tracking (e.g., pending, processed) and case association.
 
-    User->>AI: Query AI Investigator
-    AI-->>User: Grounded Investigative Insights
+*(Audio and video transcription are not currently implemented.)*
 
-    User->>System: Generate Intelligence Report
-```
+## Security
 
----
+NEXUS implements security at multiple layers:
+- **Authentication**: Secure user registration and login using bcrypt password hashing and JWT sessions.
+- **Case-Level Authorization**: Investigators can only access data, entities, and evidence belonging to their assigned cases.
+- **Protected API Routes**: All critical backend endpoints require valid authentication tokens.
+- **Audit Logging**: System tracks important actions for accountability.
+- **Environment Variables**: Secrets and keys are managed securely outside the codebase.
 
-## 🔐 Security Features
+## Performance & Scalability
 
-NEXUS prioritizes secure data handling and strict authorization at the backend boundary.
+- **Asynchronous Processing**: FastAPI and Motor provide high-performance asynchronous request handling.
+- **MongoDB Indexing**: Database schemas are designed for efficient querying of entities and relationships.
+- **Idempotent Vector Indexing**: ChromaDB securely manages embeddings without duplicating data.
 
-- **JWT Authentication** — Secure, stateless session management.
-- **Case-Level Authorization** — Users can only access data and evidence belonging to their authorized investigations.
-- **Object-Level Access Protection** — Backend validation prevents arbitrary IDs from bypassing authorization.
-- **File Type Validation** — Only supported investigation file formats are accepted during uploads.
-- **Secure UUID Naming** — Uploaded files and entities use secure identifiers.
-- **Path Traversal Protection** — Prevents malicious attempts to access restricted file directories.
-- **User-Scoped Data Access** — Intelligence data is isolated according to authenticated users and their investigations.
+## Demo Scenario
 
----
+### Operation Shadow Ledger
+"Operation Shadow Ledger" is a **fictional demonstration dataset** used to showcase NEXUS's capabilities. It demonstrates how the platform connects:
+- Individuals (e.g., Aarav Malhotra)
+- Financial accounts (e.g., ACC-78421)
+- Organizations (e.g., Apex Meridian Trading, Blue Horizon Logistics)
+- Communication information and Locations
+- Evidence and Timeline events
 
-## ⚡ Performance & Reliability
+*Example Path: Aarav Malhotra → ACC-78421 → financial transaction → ACC-55218 → Apex Meridian Trading → Blue Horizon Logistics*
 
-- **Active Case Persistence** — Investigation state can be managed and restored across sessions.
-- **Case Isolation** — Data queries are scoped to individual investigations.
-- **Error Boundaries** — Frontend components handle failures gracefully.
-- **Graceful API Failure Handling** — Backend provides clean responses for processing or AI service failures.
-- **Responsive Layouts** — Optimized for desktop and tablet investigation environments.
-- **Light & Dark Mode** — Supports multiple viewing environments for improved usability.
+**THIS IS STRICTLY FICTIONAL / DEMONSTRATION DATA AND NOT A REAL CRIMINAL INVESTIGATION.**
 
----
+## Example Investigation Questions
 
-## 📦 Installation & Setup
+Investigators can ask the AI Investigator demonstration questions such as:
+- *Who is most central to this network?*
+- *What financial path connects Aarav Malhotra to Apex Meridian Trading?*
+- *Which locations are associated with this case?*
+- *Which entities are high risk?*
+- *Is there a relationship between Aarav Malhotra and Blue Horizon Logistics?*
 
-### Prerequisites
+## Installation & Setup
 
-Make sure the following are installed:
-
-- **Node.js** v18+
-- **Python** v3.9+
-- **MongoDB** (Local installation or MongoDB Atlas)
-
----
-
-### 1. Clone the Repository
-
+### 1. Clone Repository
 ```bash
-git clone https://github.com/ASTA91-GIT/Nexus.git
+git clone <repository-url>
 cd Nexus
 ```
 
----
-
 ### 2. Frontend Setup
-
 ```bash
 cd frontend
 npm install
-npm run dev
 ```
-
-The frontend will be available at:
-
-```text
-http://localhost:3000
-```
-
----
 
 ### 3. Backend Setup
-
-Open another terminal and run:
-
 ```bash
-cd backend
+cd ../backend
 python -m venv venv
-```
-
-Activate the virtual environment.
-
-**Windows:**
-
-```bash
-venv\Scripts\activate
-```
-
-**Linux / macOS:**
-
-```bash
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
+# Windows: venv\Scripts\activate | Mac/Linux: source venv/bin/activate
 pip install -r requirements.txt
 ```
 
----
-
-### 4. Environment Configuration
-
-Create a `.env` file inside the `backend/` directory.
-
+### 4. Environment Variables
+Create a `.env` file in the `backend/` directory:
 ```env
-# Database
 MONGODB_URI=mongodb://localhost:27017
 DATABASE_NAME=nexus
-
-# Security
-JWT_SECRET=your_super_secret_key_change_in_production
-
-# AI Integration
-HUGGINGFACE_API_KEY=your_huggingface_key_here
-
-# Frontend
+JWT_SECRET=your_secure_jwt_secret_here
+HUGGINGFACE_API_KEY=your_huggingface_api_key_here
 FRONTEND_URL=http://localhost:3000
 ```
 
----
+### 5. MongoDB Setup
+Ensure you have a local instance of MongoDB running on port 27017, or update the `MONGODB_URI` to point to your MongoDB Atlas cluster.
 
-### 5. Run the Backend Server
-
+### 6. Run the Application
+**Terminal 1 (Backend):**
 ```bash
+cd backend
 uvicorn app.main:app --reload
 ```
 
-The backend API will run on:
-
-```text
-http://localhost:8000
-```
-
----
-
-## 🐳 Docker Setup (Team Development)
-
-NEXUS can be easily deployed for team development using Docker, providing a clean, reproducible environment.
-
-### Docker Prerequisites
-- Docker Desktop (or Docker Engine + Docker Compose)
-
-### Configuration
-Create a `.env` file from the `.env.example`:
-```bash
-cp .env.example .env
-```
-Ensure you have set any required secrets like `JWT_SECRET` and `HUGGINGFACE_API_KEY`.
-
-### Start NEXUS
-Run the following command to build and start the entire stack (Frontend, Backend, and MongoDB):
-```bash
-docker compose up --build -d
-```
-Once started, the application will be available at: `http://localhost:3000`
-
-### Stop NEXUS
-To gracefully stop the containers without losing data:
-```bash
-docker compose down
-```
-
-### Persistent Data
-The Docker setup ensures no data is lost when containers stop. 
-- **MongoDB Database**: Uses a persistent Docker volume named `mongodb_data`.
-- **Evidence Storage & ChromaDB**: Map directly to your local `./data/uploads` and `./data/chroma` directories, ensuring files survive container recreation.
-
-> **WARNING**: `docker compose down -v` WILL remove Docker volumes. Do not use the `-v` flag unless you explicitly intend to permanently delete the Docker MongoDB database.
-
-### Optional: Database Migration (Local to Docker)
-*By default, the Docker MongoDB and your existing Local MongoDB are completely separate environments.* If you wish to migrate existing local data into the Docker environment, follow this safe, optional process:
-
-1. **Backup Local MongoDB** (while local MongoDB is running):
-   ```bash
-   mongodump --db nexus --archive=nexus_backup.archive
-   ```
-2. **Start Docker MongoDB**:
-   ```bash
-   docker compose up -d mongodb
-   ```
-3. **Restore into Docker MongoDB**:
-   ```bash
-   docker exec -i nexus_mongodb mongorestore --archive < nexus_backup.archive
-   ```
-
----
-
-## 🧪 Testing & Verification
-
-### Frontend Build Verification
-
+**Terminal 2 (Frontend):**
 ```bash
 cd frontend
-npm run build
+npm run dev
 ```
 
-### Backend Validation
+The frontend will be accessible at `http://localhost:3000` and the backend API at `http://localhost:8000`.
 
-```bash
-cd backend
-python check_db.py
-```
+*(Optional Docker deployment is available via the provided `docker-compose.yml` in the root directory for rapid containerized setup.)*
 
-> Run additional linting or validation commands if they are configured in the project.
+## Usage
 
----
+1. **Sign In**: Register a new account or log in.
+2. **Select/Create Case**: Open the dashboard to manage your investigation workspaces.
+3. **Add Data**: Navigate to Evidence to upload documents, or manually add Entities and Relationships.
+4. **Explore Graph**: Use the Network tab to visually explore connections.
+5. **Analyze Geo/Time**: Review Locations on the map and trace events in the Timeline.
+6. **AI Investigator**: Ask natural-language questions in the chat interface.
+7. **Review Alerts**: Check the dashboard for system-generated risk indicators.
+8. **Reports**: Generate and review investigation summaries.
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
-NEXUS/
-│
-├── frontend/
+Nexus/
+├── frontend/             # Next.js React frontend application
 │   ├── src/
-│   │   ├── app/           # Next.js App Router
-│   │   ├── components/    # Reusable UI & Visualization Components
-│   │   ├── context/       # Application Context
-│   │   ├── lib/           # Utilities and Motion Variants
-│   │   └── content/       # Static Landing Content
-│   │
-│   └── public/            # Static Assets
-│
-├── backend/
+│   │   ├── app/          # Next.js App Router pages
+│   │   ├── components/   # Reusable UI components
+│   │   └── lib/          # Utilities and configuration
+│   └── package.json
+├── backend/              # FastAPI Python backend
 │   ├── app/
-│   │   ├── api/           # FastAPI Route Handlers
-│   │   ├── core/          # Database, Config & Security
-│   │   ├── models/        # Pydantic Models & Schemas
-│   │   └── services/      # Business Logic & AI Processing
-│   │
+│   │   ├── api/          # Route handlers (Auth, Cases, Entities, etc.)
+│   │   ├── models/       # Pydantic data schemas
+│   │   └── services/     # Core business logic and AI integration
 │   └── requirements.txt
-│
-├── docs/
-│   └── images/            # Documentation Screenshots
-│
-└── README.md
+├── docker-compose.yml    # Optional Docker deployment configuration
+└── README.md             # Project documentation
 ```
 
----
+## API / Backend
 
-## 🗺 Roadmap
+The FastAPI backend exposes several core RESTful routes, including:
+- `/api/auth`: User registration, login, and profile management.
+- `/api/cases`: Case creation, retrieval, and management.
+- `/api/entities`: CRUD operations for network nodes.
+- `/api/relationships`: CRUD operations for network edges.
+- `/api/evidence`: Secure file upload and evidence tracking.
+- `/api/network`: Graph data aggregation for visualization.
+- `/api/ai`: Entity extraction and natural-language chat endpoints.
+- `/api/alerts`: Risk scoring and anomaly retrieval.
+- `/api/timeline`: Chronological event data retrieval.
 
-- [ ] Advanced role-based collaboration
-- [ ] Real-time investigation collaboration
-- [ ] Expanded AI intelligence models
-- [ ] Local LLM support
-- [ ] Investigation export improvements
-- [ ] Advanced anomaly detection models
-- [ ] Performance optimization for extremely large graphs
-- [ ] Advanced notification and alert system
-- [ ] Production deployment configuration
+*(Full interactive API documentation is available at `http://localhost:8000/docs` when the backend is running.)*
 
----
+## Future Scope
 
-## 🎥 Demo
+- Integration of advanced graph analytics algorithms (e.g., PageRank, Betweenness Centrality).
+- Multimodal evidence intelligence (image processing and OCR enhancements).
+- Advanced speech and video transcription capabilities.
+- Blockchain-backed evidence integrity and chain of custody logging.
+- Larger-scale distributed deployment options for enterprise law enforcement agencies.
 
-A full interactive demonstration and visual walkthrough will be added here.
+## Responsible Use
 
-Future additions may include:
+NEXUS is designed as an investigative decision-support platform, not an automated judgment system. 
+- AI-generated insights and network highlights are intended as investigative leads and must be reviewed and verified by authorized human investigators.
+- Risk indicators do not constitute legal proof of criminal activity.
+- The demonstration scenario ("Operation Shadow Ledger") relies entirely on fictional data.
+- Operators must ensure access to sensitive investigation data is restricted to authorized personnel in compliance with local regulations.
 
-- 🎬 Product walkthrough videos
-- 🔄 Investigation workflow GIFs
-- 🕸 Interactive network demonstrations
-- 🤖 AI Investigator examples
-- 🌍 Geographic intelligence walkthroughs
+## License
 
-<!-- Example:
-![NEXUS Demo](docs/images/demo.gif)
--->
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome.
-
-1. Fork the repository.
-2. Create a feature branch.
-
-```bash
-git checkout -b feature/amazing-feature
-```
-
-3. Make your changes.
-4. Test the frontend and backend.
-5. Commit your changes.
-6. Submit a Pull Request.
-
----
-
-<div align="center">
-
-<br/>
-
-### Built for intelligent investigations.
-
-**NEXUS — Connect data. Discover relationships. Investigate intelligently.**
-
-<br/>
-
-</div>
+Licensing information for this project is not currently specified.
