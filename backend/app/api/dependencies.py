@@ -18,10 +18,12 @@ async def verify_case_access(
         
     try:
         oid = ObjectId(case_id)
+        query = {"_id": oid}
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid case_id format")
+        # Support for custom string IDs like 'CASE-RIVERFRONT-001'
+        query = {"_id": case_id}
 
-    case = await db["cases"].find_one({"_id": oid})
+    case = await db["cases"].find_one(query)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 

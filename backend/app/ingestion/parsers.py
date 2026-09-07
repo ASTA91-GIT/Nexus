@@ -29,7 +29,24 @@ async def parse_docx(file_bytes: bytes) -> str:
     try:
         import docx
         doc = docx.Document(BytesIO(file_bytes))
-        return "\n".join([para.text for para in doc.paragraphs])
+        
+        text_parts = []
+        
+        text_parts.append("DOCUMENT TEXT:")
+        for para in doc.paragraphs:
+            if para.text.strip():
+                text_parts.append(para.text.strip())
+                
+        if doc.tables:
+            text_parts.append("\nTABLE TEXT:")
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = []
+                    for cell in row.cells:
+                        row_text.append(cell.text.strip())
+                    text_parts.append(" | ".join(row_text))
+                    
+        return "\n".join(text_parts)
     except Exception as e:
         print(f"Failed to parse DOCX: {e}")
         return "Failed to parse DOCX content."

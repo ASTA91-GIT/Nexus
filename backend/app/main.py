@@ -20,6 +20,11 @@ app.include_router(api_router, prefix="/api")
 @app.on_event("startup")
 async def startup_db_client():
     await connect_to_mongo()
+    try:
+        from app.services.presentation_fallback_data import setup_presentation_cases
+        await setup_presentation_cases(get_database())
+    except Exception as e:
+        print(f"[NEXUS] Could not initialize presentation cases: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

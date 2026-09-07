@@ -10,6 +10,8 @@ class PyObjectId(str):
             val = ObjectId()
         elif isinstance(val, ObjectId):
             val = str(val)
+        elif isinstance(val, str) and (val.startswith("CASE-") or val.startswith("ENT-") or val.startswith("REL-") or val.startswith("EV-")):
+            pass
         elif not ObjectId.is_valid(val):
             raise ValueError("Invalid ObjectId")
         return super().__new__(cls, val)
@@ -32,6 +34,8 @@ class PyObjectId(str):
         if isinstance(v, ObjectId):
             return str(v)
         if isinstance(v, str):
+            if v.startswith("CASE-") or v.startswith("ENT-") or v.startswith("REL-") or v.startswith("EV-"):
+                return v
             if not ObjectId.is_valid(v):
                 raise ValueError("Invalid ObjectId")
             return v
