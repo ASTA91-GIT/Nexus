@@ -4,10 +4,67 @@ from app.graph.graph_builder import build_graph
 from app.graph.path_finder import find_shortest_path
 from app.services.rag_service import query_case_context
 
+import json
+
+async def classify_intent(query: str, history_context: str) -> dict:
+    intent_system_prompt = """You are NEXUS INTENT CLASSIFIER.
+Analyze the user's query and classify it into EXACTLY ONE of these intents:
+- GREETING
+- CASE_FACT
+- RAG_QUERY
+- PATH_TRACING
+- RISK_ANALYSIS
+- GRAPH_ANALYSIS
+- TIMELINE_QUERY
+- GEOGRAPHY_QUERY
+- EVIDENCE_GAP
+- GENERAL_KNOWLEDGE
+- CURRENT_DATE_TIME
+- SYSTEM_HELP
+- OUT_OF_SCOPE
+- CLARIFICATION_REQUIRED
+- INSUFFICIENT_CASE_DATA
+- UNKNOWN
+
+Respond in strict JSON format:
+{
+  "intent": "INTENT_NAME",
+  "entities": ["extracted", "entity", "names"],
+  "requires_graph": true
+}
+Do not include any other text or markdown, only the JSON object.
+"""
+    
+    user_prompt = f"Conversation History:\n{history_context}\n\nQuery to classify: {query}"
+    
+    try:
+        res = await call_hf_api(intent_system_prompt, user_prompt, format="json")
+        if not res:
+            return {"intent": "UNKNOWN", "entities": [], "requires_graph": False}
+        res = res.strip()
+        if res.startswith("```json"):
+            res = res[7:-3].strip()
+        elif res.startswith("```"):
+            res = res[3:-3].strip()
+            
+        data = json.loads(res)
+        valid_intents = [
+            "GREETING", "CASE_FACT", "RAG_QUERY", "PATH_TRACING", "RISK_ANALYSIS",
+            "GRAPH_ANALYSIS", "TIMELINE_QUERY", "GEOGRAPHY_QUERY", "EVIDENCE_GAP",
+            "GENERAL_KNOWLEDGE", "CURRENT_DATE_TIME", "SYSTEM_HELP", "OUT_OF_SCOPE",
+            "CLARIFICATION_REQUIRED", "INSUFFICIENT_CASE_DATA", "UNKNOWN"
+        ]
+        if data.get("intent") not in valid_intents:
+            data["intent"] = "UNKNOWN"
+        return data
+    except Exception as e:
+        print(f"Intent classification failed: {e}")
+        return {"intent": "UNKNOWN", "entities": [], "requires_graph": False}
+
 async def run_ai_investigator(query: str, case_id: str, db, current_user, history_context: str = "") -> Dict[str, Any]:
     """
     Orchestrates the grounded AI investigation. Intercepts intent, retrieves MongoDB/NetworkX facts,
-    and queries Hugging Face API (or falls back to rule-based grounding) to generate factual reports.
+    and queries local AI (or falls back to rule-based grounding) to generate factual reports.
     """
     # Helper to clean queries
     query_clean = re.sub(r'[^\w\s]', '', query.lower()).strip()
@@ -15,7 +72,70 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
 
     # --- 12 INTENT DETECTION ROUTERS ---
     
-    # 1. OUT_OF_SCOPE
+    # 0. DATE_TIME (Deterministic Phase 1)
+    date_patterns = [
+        r"^what day is today\??$",
+        r"^what is today's date\??$",
+        r"^what is the date\??$",
+        r"^what time is it\??$",
+        r"^current date\??$",
+        r"^today's date\??$"
+    ]
+    if any(re.match(p, query_lower) for p in date_patterns):
+        from datetime import datetime
+        try:
+            from tzlocal import get_localzone
+            now_local = datetime.now(get_localzone())
+            tz_str = str(get_localzone())
+        except:
+            now_local = datetime.now().astimezone()
+            tz_str = str(now_local.tzinfo)
+            
+        date_str = now_local.strftime("%Y-%m-%d")
+        time_str = now_local.strftime("%H:%M:%S")
+        day_str = now_local.strftime("%A")
+        
+        return {
+            "answer": f"Today is {day_str}, {date_str}. The current time is {time_str} ({tz_str}).",
+            "actions": [],
+            "supporting_evidence": []
+        }
+
+    # Presentation Bypass Check
+    det_bypass = get_deterministic_fallback_answer(query, case_id)
+    if det_bypass:
+        return {
+            "answer": det_bypass,
+            "actions": [],
+            "supporting_evidence": ["Presentation Case Deterministic Override"]
+        }
+
+    # Phase 2: LLM Intent Classifier
+    classification = {"intent": "UNKNOWN", "entities": [], "requires_graph": False}
+    try:
+        classification = await classify_intent(query, history_context)
+    except Exception as e:
+        print(f"Error calling classify_intent: {e}")
+        
+    intent = classification.get("intent", "UNKNOWN")
+
+    # If LLM detects OUT_OF_SCOPE or GREETING directly
+    if intent == "OUT_OF_SCOPE":
+        return {
+            "answer": "I’m NEXUS AI, an investigation intelligence assistant. I can help you analyze cases, evidence, entities, relationships, and network connections, but that request is outside my area of expertise.",
+            "actions": [],
+            "supporting_evidence": []
+        }
+    elif intent == "GREETING":
+        system_persona = "You are NEXUS AI. Respond naturally to this greeting in a concise, professional tone."
+        ans = await call_hf_api(system_persona, f"Query: {query}")
+        return {
+            "answer": ans or "Hello! I am NEXUS AI. How can I assist with your investigation today?",
+            "actions": [],
+            "supporting_evidence": []
+        }
+
+    # 1. OUT_OF_SCOPE (Regex Fallback)
     out_of_scope_patterns = [
         r"\b(?:weather|sports|celebrity|gossip|homework|math|mathematics|stock|stocks|movie|recipe|coding)\b"
     ]
@@ -26,7 +146,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
             "supporting_evidence": []
         }
 
-    # 2. GENERAL_CONVERSATION
+    # 2. GENERAL_CONVERSATION (Regex Fallback)
     conversational_patterns = [
         r"^(hi|hello|hey|greetings)(?:\s+nexus)?$",
         r"^(good morning|good afternoon|good evening)$",
@@ -236,13 +356,25 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
                     chain.append(curr_ent["name"])
                     
             path_str = " -> ".join(chain)
-            grounding_context = f"A path exists between {ent1['name']} and {ent2['name']}: {path_str}."
+            distance = len(chain) - 1
             
-            system_persona = "You are NEXUS AI, an investigation intelligence assistant. Explain the connection path between the suspects clearly."
-            user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
+            ent1_degree = sum(1 for r in relationships if str(r.get("source_entity_id")) == start_id or str(r.get("target_entity_id")) == start_id)
+            ent2_degree = sum(1 for r in relationships if str(r.get("source_entity_id")) == target_id or str(r.get("target_entity_id")) == target_id)
+            
+            grounding_context = (
+                f"GRAPH FACTS:\n"
+                f"- {ent1['name']} (Node Degree: {ent1_degree})\n"
+                f"- {ent2['name']} (Node Degree: {ent2_degree})\n\n"
+                f"SHORTEST PATH:\n"
+                f"{path_str}\n\n"
+                f"Distance: {distance}"
+            )
+            
+            system_persona = "You are NEXUS AI, an investigation intelligence assistant. Explain the connection path between the suspects clearly using the provided graph facts. Do not invent any additional edges."
+            user_prompt = f"Conversation History:\n{history_context}\n\nFacts:\n{grounding_context}\n\nQuestion: {query}"
             answer = await call_hf_api(system_persona, user_prompt)
             if not answer:
-                answer = f"The connection path between {ent1['name']} and {ent2['name']} has been traced. They are linked via: {path_str}."
+                answer = f"The connection path between {ent1['name']} and {ent2['name']} has been traced. They are linked via: {path_str} (Distance: {distance})."
                 
             return {
                 "answer": answer,
@@ -383,18 +515,22 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
                 "actions": [],
                 "supporting_evidence": []
             }
+        # PHASE 4: Context limits
+        # Truncate overly long RAG evidence to keep within Qwen 7B optimal window (e.g. ~2000 chars)
+        if len(evidence_context) > 2000:
+            evidence_context = evidence_context[:2000] + "... [TRUNCATED]"
     except Exception as e:
         print(f"Error querying ChromaDB: {e}")
         evidence_context = "Evidence search unavailable."
     
     # We allow the LLM to process FOLLOW_UP_CONTEXT internally using `history_context` and `evidence_context`.
     # To improve intelligence, we also inject a list of known entities and relationships.
-    entity_names = [e["name"] for e in entities[:30]]
+    entity_names = [e["name"] for e in entities[:20]] # Reduced from 30 for context limit
     if entity_names:
         case_summary += f"\nKnown entities in this case: {', '.join(entity_names)}."
         
     rel_names = []
-    for r in relationships[:20]:
+    for r in relationships[:10]: # Reduced from 20 for context limit
         s = next((e["name"] for e in entities if str(e["_id"]) == str(r.get("source_entity_id"))), "Unknown")
         t = next((e["name"] for e in entities if str(e["_id"]) == str(r.get("target_entity_id"))), "Unknown")
         rel_names.append(f"{s} --[{r.get('type')}]--> {t}")
@@ -403,23 +539,35 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
 
     # --- PHASE 1: Enhanced Context & System Persona ---
     from datetime import datetime
-    current_time = datetime.now()
-    date_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
-    day_str = current_time.strftime("%A")
+    
+    # Authoritative server time
+    try:
+        from tzlocal import get_localzone
+        now_local = datetime.now(get_localzone())
+        tz_str = str(get_localzone())
+    except:
+        now_local = datetime.now().astimezone()
+        tz_str = str(now_local.tzinfo)
+
+    date_str = now_local.strftime("%Y-%m-%d")
+    time_str = now_local.strftime("%H:%M:%S")
+    day_str = now_local.strftime("%A")
 
     system_persona = (
         "You are NEXUS AI, an intelligent investigation assistant.\n\n"
         f"CURRENT SYSTEM DATE: {date_str}\n"
-        f"CURRENT SYSTEM DAY: {day_str}\n\n"
+        f"CURRENT SYSTEM DAY: {day_str}\n"
+        f"CURRENT LOCAL TIME: {time_str} ({tz_str})\n\n"
         "You assist users with information related to the NEXUS investigation platform and the currently selected investigation case.\n\n"
         "STRICT GROUNDING RULES:\n"
         "1. FACT VS INFERENCE: You must clearly distinguish between established case facts (from database/evidence) and your own analytical inferences. Do not state inferences as facts.\n"
-        "2. NO HALLUCINATION: Never invent entities, relationships, evidence, case dates, or facts.\n"
-        "3. UNKNOWN INFORMATION: If the user asks for CASE facts that are not present, clearly state that it is not available in the current records.\n"
-        "4. CASE ISOLATION: Base investigation answers ONLY on the provided Case Data, Evidence Context, and Conversation History.\n"
-        "5. RESOLVE PRONOUNS: Use the Conversation History to resolve references like 'he', 'she', or 'they'.\n"
-        "6. PROFESSIONAL TONE: Respond concisely and professionally as a senior investigator. Use bullet points for complex relationships.\n"
-        "7. GENERAL KNOWLEDGE & SYSTEM CONTEXT: You MAY answer general knowledge questions or questions about the CURRENT SYSTEM DATE/TIME natively without claiming it is missing case data. Be helpful but concise.\n"
+        "2. NO HALLUCINATION: Never invent entities, relationships, evidence, case dates, or graph metrics.\n"
+        "3. UNKNOWN INFORMATION: If the user asks for CASE facts that are not present, explicitly respond: 'Insufficient evidence available in this case to determine that.' Do not guess.\n"
+        "4. NO DEFINITIVE CULPABILITY: Never make a definitive guilt/innocence determination.\n"
+        "5. CASE ISOLATION: Base investigation answers ONLY on the provided Case Data, Evidence Context, and Conversation History.\n"
+        "6. RESOLVE PRONOUNS: Use the Conversation History to resolve references like 'he', 'she', or 'they'.\n"
+        "7. PROFESSIONAL TONE: Respond concisely and professionally as a senior investigator. Use bullet points for complex facts.\n"
+        "8. GENERAL KNOWLEDGE: You MAY answer general knowledge questions naturally without claiming missing case data.\n"
     )
     
     user_prompt = f"Case Data:\n{case_summary}\n\nEvidence Context:\n{evidence_context}\n\nConversation History:\n{history_context}\n\nQuestion: {query}"
@@ -566,18 +714,20 @@ def generate_fallback_answer(query: str, case_id: str, entities: list, relations
     # 6. Default Fallback
     return "Insufficient information is available in the current case records to answer this question."
 
-async def call_hf_api(system_prompt: str, user_prompt: str, model: str = None) -> str:
+async def call_hf_api(system_prompt: str, user_prompt: str, model: str = None, format: str = None) -> str:
     """
-    Calls the local Ollama LLM instead of Hugging Face.
+    Calls the local Ollama LLM.
     """
     from app.ai.local_llm import generate
     try:
-        if model:
-            # Optionally pass model, but default uses env variable
-            response = await generate(system_prompt, user_prompt, model=model)
-        else:
-            response = await generate(system_prompt, user_prompt)
+        kwargs = {}
+        if model: kwargs["model"] = model
+        if format: kwargs["format"] = format
+        response = await generate(system_prompt, user_prompt, **kwargs)
         return response
     except Exception as e:
-        print(f"Local LLM inference failure: {e}")
+        err_str = str(e)
+        print(f"Local LLM inference failure: {err_str}")
+        if "LOCAL_AI_UNAVAILABLE" in err_str or "LOCAL_AI_TIMEOUT" in err_str:
+            return f"Analysis unavailable: {err_str}"
         return ""
