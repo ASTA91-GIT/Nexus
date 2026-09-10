@@ -61,6 +61,17 @@ Do not include any other text or markdown, only the JSON object.
         print(f"Intent classification failed: {e}")
         return {"intent": "UNKNOWN", "entities": [], "requires_graph": False}
 
+def validate_classifier_entities(entities: Any) -> list:
+    if not isinstance(entities, list):
+        return []
+    valid = []
+    for e in entities:
+        if isinstance(e, str):
+            clean = e.strip()
+            if clean and clean.lower() not in [v.lower() for v in valid]:
+                valid.append(clean)
+    return valid
+
 async def run_ai_investigator(query: str, case_id: str, db, current_user, history_context: str = "") -> Dict[str, Any]:
     """
     Orchestrates the grounded AI investigation. Intercepts intent, retrieves MongoDB/NetworkX facts,
@@ -118,6 +129,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         print(f"Error calling classify_intent: {e}")
         
     intent = classification.get("intent", "UNKNOWN")
+    classifier_entities = validate_classifier_entities(classification.get("entities", []))
 
     # If LLM detects OUT_OF_SCOPE or GREETING directly
     if intent == "OUT_OF_SCOPE":
@@ -299,21 +311,37 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
     pronouns = [r"\bhe\b", r"\bshe\b", r"\bthey\b", r"\bhim\b", r"\bher\b", r"\bit\b", r"\bthis\b"]
     is_follow_up = any(re.search(p, query_lower) for p in pronouns)
     
-    # Existing PATH_TRACING
+    # Existing PATH_TRACING combined with Phase 3.5 Intent entities
     path_match = re.search(r"(?:connection between|path between|link between|relationship between)\s+([a-zA-Z\s]+)\s+and\s+([a-zA-Z\s\?]+)", query_lower)
     if not path_match:
         path_match = re.search(r"(?:how is\s+)?([a-zA-Z\s]+)\s+(?:connected to|related to|linked to)\s+([a-zA-Z\s\?]+)", query_lower)
         
-    if path_match:
-        name1 = path_match.group(1).strip().replace("?", "")
-        name2 = path_match.group(2).strip().replace("?", "")
+    is_path_tracing = (intent == "PATH_TRACING" and len(classifier_entities) >= 2) or path_match
+
+    if is_path_tracing:
+        if intent == "PATH_TRACING" and len(classifier_entities) > 2:
+            return {
+                "answer": "The path tracing feature currently only supports analyzing connections between two specific entities at a time.",
+                "actions": [],
+                "supporting_evidence": []
+            }
+            
+        ent1 = None
+        ent2 = None
         
-        ent1 = next((e for e in entities if name1 in e["name"].lower()), None)
-        ent2 = next((e for e in entities if name2 in e["name"].lower()), None)
+        if intent == "PATH_TRACING" and len(classifier_entities) == 2:
+            n1 = classifier_entities[0].lower()
+            n2 = classifier_entities[1].lower()
+            ent1 = next((e for e in entities if n1 in e["name"].lower()), None)
+            ent2 = next((e for e in entities if n2 in e["name"].lower()), None)
+            
+        if (not ent1 or not ent2) and path_match:
+            name1 = path_match.group(1).strip().replace("?", "")
+            name2 = path_match.group(2).strip().replace("?", "")
+            ent1 = next((e for e in entities if name1 in e["name"].lower()), None)
+            ent2 = next((e for e in entities if name2 in e["name"].lower()), None)
         
         if not ent1 or not ent2:
-            # Maybe it's a follow-up? "who is he connected to?" 
-            # If so, it doesn't match this regex cleanly, or it matches name1 = "he". We let it fall through to RAG.
             if not is_follow_up:
                 return {
                     "answer": "There is insufficient evidence in the current case data to establish a relationship.",
@@ -384,14 +412,22 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
 
     # 7. RISK_ANALYSIS
     risk_match = re.search(r"(?:why is|explain risk of|risk score of)\s+([a-zA-Z\s\?]+)", query_lower)
-    if risk_match:
-        target_name = risk_match.group(1).strip().replace("?", "")
-        ent = next((e for e in entities if target_name in e["name"].lower()), None)
+    is_risk = (intent == "RISK_ANALYSIS" and len(classifier_entities) >= 1) or risk_match
+    if is_risk:
+        ent = None
+        if intent == "RISK_ANALYSIS" and len(classifier_entities) >= 1:
+            target_name = classifier_entities[0].lower()
+            ent = next((e for e in entities if target_name in e["name"].lower()), None)
+            
+        if not ent and risk_match:
+            target_name = risk_match.group(1).strip().replace("?", "")
+            ent = next((e for e in entities if target_name in e["name"].lower()), None)
+            
         if ent:
             risk = ent.get("risk_score", 0.0)
             properties = ent.get("properties", {})
-            classification = ent.get("type", "PERSON")
-            grounding_context = f"Suspect '{ent['name']}' classified as {classification} has a threat risk index of {risk:.2f}. Attributes: {properties}."
+            classification_type = ent.get("type", "PERSON")
+            grounding_context = f"Suspect '{ent['name']}' classified as {classification_type} has a threat risk index of {risk:.2f}. Attributes: {properties}."
             
             system_persona = "You are NEXUS AI, an investigation intelligence assistant. Explain why this suspect is marked with this risk index based strictly on facts."
             user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
@@ -574,7 +610,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
     answer = await call_hf_api(system_persona, user_prompt)
     
     if not answer:
-        answer = generate_fallback_answer(query, case_id, entities, relationships, evidence_context)
+        answer = generate_fallback_answer(query, case_id, entities, relationships, evidence_context, intent, classifier_entities)
         
     return {
         "answer": answer,
@@ -638,7 +674,10 @@ def get_deterministic_fallback_answer(query: str, case_id: str) -> str | None:
             
     return None
 
-def generate_fallback_answer(query: str, case_id: str, entities: list, relationships: list, evidence_context: str) -> str:
+def generate_fallback_answer(query: str, case_id: str, entities: list, relationships: list, evidence_context: str, intent: str = "UNKNOWN", classifier_entities: list = None) -> str:
+    if classifier_entities is None:
+        classifier_entities = []
+        
     if case_id in ["CASE-RIVERFRONT-001", "CASE-MERIDIAN-002", "CASE-VEHICLE-003"]:
         deterministic_answer = get_deterministic_fallback_answer(query, case_id)
         if deterministic_answer:
@@ -694,9 +733,18 @@ def generate_fallback_answer(query: str, case_id: str, entities: list, relations
         
     # 5. Who is connected to X?
     connected_match = re.search(r"(?:who is|what is) connected to ([a-zA-Z\s]+)", query_clean)
-    if connected_match:
-        target_name = connected_match.group(1).strip()
-        target_ent = next((e for e in entities if target_name in e.get("name", "").lower()), None)
+    is_connected_query = (intent in ["GRAPH_ANALYSIS", "PATH_TRACING", "CASE_RELATIONSHIP"] and len(classifier_entities) == 1) or connected_match
+    
+    if is_connected_query:
+        target_ent = None
+        if intent in ["GRAPH_ANALYSIS", "PATH_TRACING", "CASE_RELATIONSHIP"] and len(classifier_entities) == 1:
+            target_name = classifier_entities[0].lower()
+            target_ent = next((e for e in entities if target_name in e.get("name", "").lower()), None)
+            
+        if not target_ent and connected_match:
+            target_name = connected_match.group(1).strip()
+            target_ent = next((e for e in entities if target_name in e.get("name", "").lower()), None)
+            
         if target_ent:
             tid = str(target_ent["_id"])
             connections = []
