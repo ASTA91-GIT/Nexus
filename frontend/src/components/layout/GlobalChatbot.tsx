@@ -15,7 +15,6 @@ export default function GlobalChatbot() {
   const { activeCaseId, activeCase } = useCase();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [scope, setScope] = useState<"active" | "all">("all");
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
@@ -36,10 +35,12 @@ export default function GlobalChatbot() {
     }
   }, [messages, isOpen, isMinimized]);
 
-  // Sync scope selection with case context and load entities
+  // Sync case context and load entities
   useEffect(() => {
+    // Clear conversation history to prevent contamination when case switches
+    setMessages([]);
+    
     if (activeCaseId) {
-      setScope("active");
       const token = localStorage.getItem("token");
       fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), {
         headers: { Authorization: `Bearer ${token}` }
@@ -47,7 +48,6 @@ export default function GlobalChatbot() {
         if (Array.isArray(data)) setCaseEntities(data);
       }).catch(e => console.error(e));
     } else {
-      setScope("all");
       setCaseEntities([]);
     }
   }, [activeCaseId]);
@@ -62,9 +62,9 @@ export default function GlobalChatbot() {
   }, []);
 
   const handleSendMessage = async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || !activeCaseId) return;
 
-    const currentScopeId = scope === "active" ? activeCaseId : "all";
+    const currentScopeId = activeCaseId;
 
     const userMsg: Message = {
       sender: "user",
@@ -216,35 +216,13 @@ export default function GlobalChatbot() {
             </div>
           </header>
 
-          {/* Scope Toggle / Controller */}
+          {/* Active Case Indicator */}
           <div className="px-5 py-2.5 border-b border-white/5 bg-zinc-900/30 flex gap-2 justify-between items-center shrink-0">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
-              <i className="fa-solid fa-magnifying-glass text-zinc-600"></i> Scope:
+              <i className="fa-solid fa-folder-open text-zinc-600"></i> Active Case:
             </span>
-            <div className="flex bg-zinc-950/80 p-1 rounded-lg border border-white/5 shadow-inner">
-              <button
-                disabled={!activeCaseId}
-                onClick={() => setScope("active")}
-                className={`px-3 py-1.5 rounded-md text-[10px] font-bold tracking-wide transition-all duration-200 cursor-pointer ${
-                  scope === "active"
-                    ? "bg-blue-600/20 text-blue-400 border border-blue-500/20 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5 border border-transparent disabled:opacity-30 disabled:cursor-not-allowed"
-                }`}
-                title={!activeCaseId ? "Select an active case in sidebar first" : `Query only: ${activeCase?.name || "Active Case"}`}
-              >
-                <i className="fa-solid fa-folder-open mr-1"></i> Active Case
-              </button>
-              <button
-                onClick={() => setScope("all")}
-                className={`px-3 py-1.5 rounded-md text-[10px] font-bold tracking-wide transition-all duration-200 cursor-pointer ${
-                  scope === "all"
-                    ? "bg-blue-600/20 text-blue-400 border border-blue-500/20 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5 border border-transparent"
-                }`}
-                title="Query entire crime dataset"
-              >
-                <i className="fa-solid fa-globe mr-1"></i> Global DB
-              </button>
+            <div className="text-[10px] font-bold text-blue-400">
+              {activeCaseId ? (activeCase?.name || activeCaseId) : "No active case selected"}
             </div>
           </div>
 
@@ -309,7 +287,7 @@ export default function GlobalChatbot() {
                     {msg.evidence && msg.evidence.length > 0 && (
                       <div className="mt-3.5 pt-3 border-t border-white/10 text-[9px] font-mono text-zinc-400 bg-zinc-950/30 -mx-4 -mb-4 px-4 pb-3">
                         <p className="font-bold uppercase text-zinc-500 mb-1 flex items-center gap-1.5">
-                          <i className="fa-solid fa-database text-[10px]"></i> Grounded evidence:
+                          <i className="fa-solid fa-database text-[10px]"></i> Grounded case context:
                         </p>
                         {msg.evidence.map((ev, i) => <div key={i} className="truncate ml-4 relative before:absolute before:content-[''] before:w-1 before:h-1 before:bg-zinc-600 before:rounded-full before:top-1.5 before:-left-3">&nbsp;{ev}</div>)}
                       </div>
@@ -374,20 +352,20 @@ export default function GlobalChatbot() {
                 <input
                   type="text"
                   placeholder={
-                    scope === "active"
-                      ? "Query active case file..."
-                      : "Query global database across all cases..."
+                    activeCaseId
+                      ? "Query active case..."
+                      : "Select a case to start an investigation."
                   }
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   className="w-full pl-9 pr-4 py-3 rounded-xl bg-zinc-900 border border-white/10 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 placeholder-zinc-600 text-white transition-all shadow-inner"
-                  disabled={sending}
+                  disabled={sending || !activeCaseId}
                   required
                 />
               </div>
               <button
                 type="submit"
-                disabled={sending || !inputValue.trim()}
+                disabled={sending || !inputValue.trim() || !activeCaseId}
                 className="px-5 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:border-zinc-700 disabled:shadow-none border border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.2)] hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] rounded-xl text-[13px] font-bold text-white transition-all duration-200 active:scale-[0.96] cursor-pointer flex items-center gap-2"
                 aria-label="Send Message"
               >
