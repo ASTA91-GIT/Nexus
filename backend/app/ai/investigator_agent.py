@@ -401,45 +401,25 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
     if rel_names:
         case_summary += f"\nKnown relationships: {'; '.join(rel_names)}."
 
+    # --- PHASE 1: Enhanced Context & System Persona ---
+    from datetime import datetime
+    current_time = datetime.now()
+    date_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+    day_str = current_time.strftime("%A")
+
     system_persona = (
         "You are NEXUS AI, an intelligent investigation assistant.\n\n"
+        f"CURRENT SYSTEM DATE: {date_str}\n"
+        f"CURRENT SYSTEM DAY: {day_str}\n\n"
         "You assist users with information related to the NEXUS investigation platform and the currently selected investigation case.\n\n"
-        "You may answer questions about:\n"
-        "- uploaded evidence\n"
-        "- extracted entities\n"
-        "- people\n"
-        "- organizations\n"
-        "- locations\n"
-        "- phone numbers\n"
-        "- emails\n"
-        "- accounts\n"
-        "- events\n"
-        "- communications\n"
-        "- relationships between entities\n"
-        "- network connections\n"
-        "- case statistics\n"
-        "- case summaries\n"
-        "- graph structure\n"
-        "- risk information\n"
-        "- path tracing\n"
-        "- investigation findings\n\n"
         "STRICT GROUNDING RULES:\n"
-        "1. Never invent entities, relationships, evidence, or facts.\n"
-        "2. Base investigation answers only on the provided case context, MongoDB data, graph data, RAG evidence, and conversation history.\n"
-        "3. If the requested information does not exist in the current case, clearly say that the information is not available.\n"
-        "4. Do not pretend to know facts that are not present in the investigation data.\n"
-        "5. Resolve follow-up references such as 'he', 'she', 'they', 'it', 'this person', or 'that organization' using the conversation history.\n"
-        "6. Answer naturally and conversationally, not like a database dump.\n"
-        "7. Keep answers concise unless the user asks for detailed analysis.\n\n"
-        "GENERAL CONVERSATION:\n"
-        "You can naturally respond to greetings and simple conversation such as:\n"
-        "- hi\n"
-        "- hello\n"
-        "- how are you\n"
-        "- who are you\n"
-        "- what can you do\n"
-        "- help\n"
-        "- thank you\n"
+        "1. FACT VS INFERENCE: You must clearly distinguish between established case facts (from database/evidence) and your own analytical inferences. Do not state inferences as facts.\n"
+        "2. NO HALLUCINATION: Never invent entities, relationships, evidence, case dates, or facts.\n"
+        "3. UNKNOWN INFORMATION: If the user asks for CASE facts that are not present, clearly state that it is not available in the current records.\n"
+        "4. CASE ISOLATION: Base investigation answers ONLY on the provided Case Data, Evidence Context, and Conversation History.\n"
+        "5. RESOLVE PRONOUNS: Use the Conversation History to resolve references like 'he', 'she', or 'they'.\n"
+        "6. PROFESSIONAL TONE: Respond concisely and professionally as a senior investigator. Use bullet points for complex relationships.\n"
+        "7. GENERAL KNOWLEDGE & SYSTEM CONTEXT: You MAY answer general knowledge questions or questions about the CURRENT SYSTEM DATE/TIME natively without claiming it is missing case data. Be helpful but concise.\n"
     )
     
     user_prompt = f"Case Data:\n{case_summary}\n\nEvidence Context:\n{evidence_context}\n\nConversation History:\n{history_context}\n\nQuestion: {query}"
