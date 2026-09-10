@@ -2,7 +2,6 @@ import re
 from typing import Dict, Any, List
 from app.graph.graph_builder import build_graph
 from app.graph.path_finder import find_shortest_path
-from app.ai.model_manager import get_hf_client
 from app.services.rag_service import query_case_context
 
 async def run_ai_investigator(query: str, case_id: str, db, current_user, history_context: str = "") -> Dict[str, Any]:
@@ -66,7 +65,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
             
         system_persona = "You are NEXUS AI, an investigation intelligence assistant. Answer naturally based on the provided facts."
         user_prompt = f"Facts: {fallback_msg}\n\nQuestion: {query}"
-        answer = call_hf_api(system_persona, user_prompt)
+        answer = await call_hf_api(system_persona, user_prompt)
         if not answer:
             answer = fallback_msg
             
@@ -118,7 +117,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         
         system_persona = "You are NEXUS AI, an investigation intelligence assistant. Summarize the active case context for the user."
         user_prompt = f"Facts: {fallback_msg}\n\nQuestion: {query}"
-        answer = call_hf_api(system_persona, user_prompt)
+        answer = await call_hf_api(system_persona, user_prompt)
         if not answer:
             answer = fallback_msg
             
@@ -148,7 +147,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
             
         system_persona = "You are NEXUS AI, an investigation intelligence assistant. Answer naturally based on facts."
         user_prompt = f"Facts: {fallback_msg}\n\nQuestion: {query}"
-        answer = call_hf_api(system_persona, user_prompt)
+        answer = await call_hf_api(system_persona, user_prompt)
         if not answer:
             answer = fallback_msg
             
@@ -241,7 +240,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
             
             system_persona = "You are NEXUS AI, an investigation intelligence assistant. Explain the connection path between the suspects clearly."
             user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
-            answer = call_hf_api(system_persona, user_prompt)
+            answer = await call_hf_api(system_persona, user_prompt)
             if not answer:
                 answer = f"The connection path between {ent1['name']} and {ent2['name']} has been traced. They are linked via: {path_str}."
                 
@@ -264,7 +263,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
             
             system_persona = "You are NEXUS AI, an investigation intelligence assistant. Explain why this suspect is marked with this risk index based strictly on facts."
             user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
-            answer = call_hf_api(system_persona, user_prompt)
+            answer = await call_hf_api(system_persona, user_prompt)
             if not answer:
                 status_flag = "suspicious attributes" if properties.get("flagged") else "network positions"
                 answer = f"Suspect '{ent['name']}' has a risk score of {risk:.2f} due to {status_flag}. Attributes recorded: {properties}."
@@ -291,7 +290,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
         grounding_context = f"High-risk suspects detected in {scope_text}: {list_str}."
         system_persona = "You are NEXUS AI, an investigation intelligence assistant. Present the list of high threat targets professionally."
         user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
-        answer = call_hf_api(system_persona, user_prompt)
+        answer = await call_hf_api(system_persona, user_prompt)
         if not answer:
             answer = f"The following high-risk suspect profiles require immediate review: {list_str}."
         return {
@@ -356,7 +355,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
             grounding_context = f"Entities who {rel_type.lower()} {target_ent['name']}: {actors_str}."
             system_persona = "You are NEXUS AI, an investigation intelligence assistant. Report the findings based strictly on the facts."
             user_prompt = f"Conversation History:\n{history_context}\n\nFacts: {grounding_context}\n\nQuestion: {query}"
-            answer = call_hf_api(system_persona, user_prompt)
+            answer = await call_hf_api(system_persona, user_prompt)
             if not answer:
                 answer = f"The following entities are recorded as having {rel_type.lower()} {target_ent['name']}: {actors_str}."
             action_node = str(relevant_rels[0].get("source_entity_id")) if relevant_rels else target_id_str
@@ -444,7 +443,7 @@ async def run_ai_investigator(query: str, case_id: str, db, current_user, histor
     )
     
     user_prompt = f"Case Data:\n{case_summary}\n\nEvidence Context:\n{evidence_context}\n\nConversation History:\n{history_context}\n\nQuestion: {query}"
-    answer = call_hf_api(system_persona, user_prompt)
+    answer = await call_hf_api(system_persona, user_prompt)
     
     if not answer:
         answer = generate_fallback_answer(query, case_id, entities, relationships, evidence_context)
@@ -518,87 +517,87 @@ def generate_fallback_answer(query: str, case_id: str, entities: list, relations
             return deterministic_answer
 
     query_clean = re.sub(r'[^\w\s]', '', query.lower()).strip()
-    query_words = [w.lower() for w in re.findall(r'\b[a-zA-Z0-9]+\b', query) if len(w) > 2 and w.lower() not in ['who', 'what', 'where', 'when', 'how', 'why', 'is', 'are', 'the', 'this', 'that', 'for', 'about']]
     
-    # 1. Search evidence context for matching sentences
-    matching_sentences = []
-    if evidence_context:
-        lines = [line.strip() for line in evidence_context.split('\n') if line.strip()]
-        for line in lines:
-            line_lower = line.lower()
-            if any(qw in line_lower for qw in query_words):
-                clean_line = re.sub(r'^\d+\.\s*', '', line)
-                if clean_line not in matching_sentences:
-                    matching_sentences.append(clean_line)
-                    
-    # 2. Search matching entities in MongoDB
-    matching_entities = []
-    for ent in entities:
-        ent_name = ent.get('name', '')
-        if any(qw in ent_name.lower() for qw in query_words):
-            matching_entities.append(ent)
-            
-    # 3. Build factual grounded response
-    if matching_sentences:
-        answer = "Based on investigation evidence:\n\n"
-        answer += "\n".join([f"• {s}" for s in matching_sentences[:5]])
-        if matching_entities:
-            ent_summary = ", ".join([f"{e['name']} ({e.get('type', 'ENTITY')})" for e in matching_entities[:3]])
-            answer += f"\n\nAssociated Entity Profile(s): {ent_summary}."
-        return answer
-
-    if matching_entities:
-        ent = matching_entities[0]
-        ent_name = ent.get('name')
-        ent_type = ent.get('type', 'ENTITY')
-        desc = ent.get('properties', {}).get('description') or ent.get('description', '')
-        risk = ent.get('risk_score', 0.5)
-        
-        answer = f"Entity Profile: {ent_name} ({ent_type})\n"
-        if desc:
-            answer += f"Description: {desc}\n"
-        answer += f"Threat Risk Index: {risk:.2f}\n"
-        
-        ent_id = str(ent['_id'])
-        rel_strs = []
+    # Generic Data-Driven Fallbacks (Only use actual entities and relationships)
+    
+    # 1. Who is most central?
+    if "central" in query_clean and ("most" in query_clean or "network" in query_clean):
+        if not relationships:
+            return "Insufficient information is available in the current case records to answer this question."
+        counts = {}
         for r in relationships:
-            src = str(r.get('source_entity_id'))
-            tgt = str(r.get('target_entity_id'))
-            r_type = r.get('type', 'LINKED')
-            if src == ent_id or tgt == ent_id:
-                other_id = tgt if src == ent_id else src
-                other_ent = next((e for e in entities if str(e['_id']) == other_id), None)
-                if other_ent:
-                    rel_strs.append(f"{r_type} -> {other_ent['name']}")
-        if rel_strs:
-            answer += f"Connections: {', '.join(rel_strs[:5])}."
-        return answer
-
-    if case_id == "all":
-        return f"I am connected to the global NEXUS intelligence database. Currently, we have registered {len(entities)} unique suspect profiles and {len(relationships)} connections across all investigation files."
-    else:
-        return f"I am connected to the active investigation database. Currently, we have registered {len(entities)} suspect profiles and {len(relationships)} connections in this case file."
-
-def call_hf_api(system_prompt: str, user_prompt: str, model: str = "Qwen/Qwen2.5-72B-Instruct") -> str:
-    """
-    Calls Hugging Face Inference Client chat completion with the Qwen model.
-    """
-    client = get_hf_client()
-    if not client:
-        return ""
+            counts[str(r.get("source_entity_id"))] = counts.get(str(r.get("source_entity_id")), 0) + 1
+            counts[str(r.get("target_entity_id"))] = counts.get(str(r.get("target_entity_id")), 0) + 1
+        most_central_id = max(counts, key=counts.get)
+        central_ent = next((e for e in entities if str(e["_id"]) == most_central_id), None)
+        if central_ent:
+            return f"Based on the current case records, the most central entity in the network is {central_ent.get('name')} with {counts[most_central_id]} connections."
+            
+    # 2. What organizations are involved?
+    if "organization" in query_clean or "organizations" in query_clean:
+        orgs = [e.get("name") for e in entities if e.get("type", "").upper() == "ORGANIZATION"]
+        if orgs:
+            return f"The organizations involved in the current case records are: {', '.join(orgs)}."
+        return "Insufficient information is available in the current case records to answer this question."
         
+    # 3. What locations are involved?
+    if "location" in query_clean or "locations" in query_clean or "where" in query_clean:
+        locs = [e.get("name") for e in entities if e.get("type", "").upper() == "LOCATION"]
+        if locs:
+            return f"The locations associated with the current case records are: {', '.join(locs)}."
+        # Don't return insufficient for "where" as it might be handled below
+        if "location" in query_clean:
+            return "Insufficient information is available in the current case records to answer this question."
+
+    # 4. What financial transactions occurred?
+    if "financial" in query_clean or "transaction" in query_clean or "transferred" in query_clean:
+        trans_rels = [r for r in relationships if r.get("type", "").upper() in ["TRANSFERRED_TO", "FINANCED"]]
+        if trans_rels:
+            res = "Financial transactions found in case records:\n"
+            for r in trans_rels:
+                src = next((e.get("name") for e in entities if str(e["_id"]) == str(r.get("source_entity_id"))), "Unknown")
+                tgt = next((e.get("name") for e in entities if str(e["_id"]) == str(r.get("target_entity_id"))), "Unknown")
+                res += f"- {src} -> {tgt} ({r.get('type')})\n"
+            return res.strip()
+        amounts = [e.get("name") for e in entities if e.get("type", "").upper() == "FINANCIAL_AMOUNT"]
+        if amounts:
+            return f"Financial amounts found in the case records: {', '.join(amounts)}."
+        return "Insufficient information is available in the current case records to answer this question."
+        
+    # 5. Who is connected to X?
+    connected_match = re.search(r"(?:who is|what is) connected to ([a-zA-Z\s]+)", query_clean)
+    if connected_match:
+        target_name = connected_match.group(1).strip()
+        target_ent = next((e for e in entities if target_name in e.get("name", "").lower()), None)
+        if target_ent:
+            tid = str(target_ent["_id"])
+            connections = []
+            for r in relationships:
+                if str(r.get("source_entity_id")) == tid:
+                    other = next((e.get("name") for e in entities if str(e["_id"]) == str(r.get("target_entity_id"))), None)
+                    if other: connections.append(f"{other} ({r.get('type')})")
+                elif str(r.get("target_entity_id")) == tid:
+                    other = next((e.get("name") for e in entities if str(e["_id"]) == str(r.get("source_entity_id"))), None)
+                    if other: connections.append(f"{other} ({r.get('type')})")
+            if connections:
+                return f"Based on the case records, {target_ent.get('name')} is connected to: {', '.join(connections)}."
+        return "Insufficient information is available in the current case records to answer this question."
+
+    # 6. Default Fallback
+    return "Insufficient information is available in the current case records to answer this question."
+
+async def call_hf_api(system_prompt: str, user_prompt: str, model: str = None) -> str:
+    """
+    Calls the local Ollama LLM instead of Hugging Face.
+    """
+    from app.ai.local_llm import generate
     try:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-        response = client.chat_completion(
-            model=model,
-            messages=messages,
-            max_tokens=400,
-            temperature=0.3
-        )
-        return response.choices[0].message.content.strip()
+        if model:
+            # Optionally pass model, but default uses env variable
+            response = await generate(system_prompt, user_prompt, model=model)
+        else:
+            response = await generate(system_prompt, user_prompt)
+        return response
     except Exception as e:
-        print(f"Hugging Face Client inference failure: {e}")
+        print(f"Local LLM inference failure: {e}")
         return ""

@@ -24,17 +24,57 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Map evidence uploads and chromadb data to persist
       - ./data/uploads:/data/uploads
       - ./data/chroma:/data/chroma
     environment:
       - MONGODB_URI=mongodb://mongodb:27017
       - DATABASE_NAME=${DATABASE_NAME:-nexus}
-      - JWT_SECRET=${JWT_SECRET}
-      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - JWT_SECRET=${JWT_SECRET:-supersecretkey}
+      - NEXUS_LOCAL_AI_URL=http://ollama:11434
+      - NEXUS_LOCAL_AI_MODEL=${NEXUS_LOCAL_AI_MODEL:-qwen2.5:7b}
       - FRONTEND_URL=http://localhost:3000
     depends_on:
       mongodb:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    networks:
+      - nexus_network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nexus_ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - nexus_network
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama-init:
+    image: curlimages/curl:latest
+    container_name: nexus_ollama_init
+    environment:
+      - NEXUS_LOCAL_AI_MODEL=${NEXUS_LOCAL_AI_MODEL:-qwen2.5:7b}
+    command: >
+      sh -c "
+      echo 'Waiting for Ollama to be healthy...';
+      until curl -s -f http://ollama:11434/api/version > /dev/null; do sleep 2; done;
+      echo 'Ollama is up. Checking if model '$$NEXUS_LOCAL_AI_MODEL' exists...';
+      if curl -s http://ollama:11434/api/tags | grep -q '\"name\":\"'$$NEXUS_LOCAL_AI_MODEL'\"'; then
+        echo 'Model already exists. Initialization complete.';
+      else
+        echo 'Model not found. Pulling '$$NEXUS_LOCAL_AI_MODEL'... This may take several minutes.';
+        curl -s -f -X POST http://ollama:11434/api/pull -d '{\"name\":\"'$$NEXUS_LOCAL_AI_MODEL'\"}';
+        echo 'Model pull complete.';
+      fi
+      "
+    depends_on:
+      ollama:
         condition: service_healthy
     networks:
       - nexus_network
@@ -52,13 +92,16 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
-      - backend
+      backend:
+        condition: service_started
     networks:
       - nexus_network
 
 volumes:
   mongodb_data:
     name: nexus_mongodb_data
+  ollama_data:
+    name: nexus_ollama_data
 
 networks:
   nexus_network:

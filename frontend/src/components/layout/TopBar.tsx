@@ -12,6 +12,7 @@ export default function TopBar() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [caseDropdownOpen, setCaseDropdownOpen] = useState(false);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<"READY" | "INITIALIZING" | "UNAVAILABLE">("INITIALIZING");
 
   const loadAvatar = () => {
     const savedAvatar = localStorage.getItem("user_avatar");
@@ -22,6 +23,35 @@ export default function TopBar() {
     loadAvatar();
     window.addEventListener("avatar-updated", loadAvatar);
     return () => window.removeEventListener("avatar-updated", loadAvatar);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkAiStatus = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/health`);
+        if (!res.ok) throw new Error("API error");
+        const data = await res.json();
+        if (!mounted) return;
+        
+        if (data.LOCAL_AI_SERVER_READY && data.LOCAL_AI_MODEL_READY) {
+          setAiStatus("READY");
+        } else if (data.LOCAL_AI_SERVER_READY && !data.LOCAL_AI_MODEL_READY) {
+          setAiStatus("INITIALIZING");
+        } else {
+          setAiStatus("UNAVAILABLE");
+        }
+      } catch (err) {
+        if (mounted) setAiStatus("UNAVAILABLE");
+      }
+    };
+    
+    checkAiStatus();
+    const interval = setInterval(checkAiStatus, 10000); // poll every 10s
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // Synchronously compute the current case from the cases array to prevent async UI desync
@@ -91,6 +121,28 @@ export default function TopBar() {
 
       {/* Right: Actions & Profile */}
       <div className="flex items-center gap-3">
+        {/* AI Status */}
+        <div className="flex items-center gap-2 px-2 py-1.5 bg-[var(--surface-secondary)] border border-[var(--border-primary)] rounded-md cursor-default text-xs font-medium mr-1 transition-all" title="Local AI Status">
+          {aiStatus === "READY" && (
+            <>
+              <div className="w-2 h-2 rounded-full bg-[var(--success)] shadow-[0_0_5px_var(--success)]"></div>
+              <span className="text-[var(--text-secondary)] tracking-wide">AI Ready</span>
+            </>
+          )}
+          {aiStatus === "INITIALIZING" && (
+            <>
+              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+              <span className="text-[var(--text-secondary)] tracking-wide">Local AI Initializing</span>
+            </>
+          )}
+          {aiStatus === "UNAVAILABLE" && (
+            <>
+              <div className="w-2 h-2 rounded-full bg-[var(--danger)]"></div>
+              <span className="text-[var(--text-secondary)] tracking-wide">Local AI Unavailable</span>
+            </>
+          )}
+        </div>
+
         {/* AI Shortcut */}
         <button 
           className="px-3 py-1.5 text-xs font-bold bg-[var(--accent-primary)] text-white rounded-md hover:bg-[var(--accent-secondary)] hover:shadow-[0_0_8px_rgba(20,200,235,0.4)] focus:ring-2 focus:ring-[var(--accent-secondary)] focus:ring-offset-1 focus:ring-offset-[var(--surface-primary)] active:scale-95 transition-all duration-200 flex items-center gap-2 border border-[var(--accent-primary)]"

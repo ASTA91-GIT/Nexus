@@ -186,57 +186,68 @@ Investigators can ask the AI Investigator demonstration questions such as:
 - *Which entities are high risk?*
 - *Is there a relationship between Aarav Malhotra and Blue Horizon Logistics?*
 
-## Installation & Setup
+## Installation & Setup (Docker Desktop - Recommended)
 
-### 1. Clone Repository
+The recommended way to run NEXUS is via Docker Desktop. This provides a "zero-terminal" experience where all dependencies, databases, and the local AI models are automatically managed.
+
+### 1. Requirements
+- **Docker Desktop** installed and running on your system.
+
+### 2. Quick Start (Windows)
+Simply run the included launcher:
+```text
+Start-NEXUS.bat
+```
+This will automatically check Docker and start the NEXUS stack in the background.
+
+### 3. Quick Start (Mac/Linux)
+Open a terminal in the project directory and run:
 ```bash
-git clone <repository-url>
-cd Nexus
+docker compose up -d
 ```
 
-### 2. Frontend Setup
+### Important: First Startup & AI Model Initialization
+On the very first startup, the `ollama-init` container will automatically download the local AI model (`qwen2.5:7b`). **This may take several minutes depending on your internet connection.** 
+Once downloaded, the model is saved to a persistent volume and subsequent startups will be much faster. You can safely access the frontend at `http://localhost:3000` while the model initializes; the UI will indicate "Local AI Initializing" until it is ready.
+
+---
+
+## Advanced Troubleshooting / Manual Setup
+
+If you prefer not to use Docker, you can run the components manually:
+
+### 1. Frontend Setup
 ```bash
 cd frontend
 npm install
+npm run dev
 ```
 
-### 3. Backend Setup
+### 2. Backend Setup
 ```bash
-cd ../backend
+cd backend
 python -m venv venv
 # Windows: venv\Scripts\activate | Mac/Linux: source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Environment Variables
+### 3. Environment Variables
 Create a `.env` file in the `backend/` directory:
 ```env
 MONGODB_URI=mongodb://localhost:27017
 DATABASE_NAME=nexus
 JWT_SECRET=your_secure_jwt_secret_here
-HUGGINGFACE_API_KEY=your_huggingface_api_key_here
+NEXUS_LOCAL_AI_URL=http://localhost:11434
+NEXUS_LOCAL_AI_MODEL=qwen2.5:7b
 FRONTEND_URL=http://localhost:3000
 ```
 
-### 5. MongoDB Setup
-Ensure you have a local instance of MongoDB running on port 27017, or update the `MONGODB_URI` to point to your MongoDB Atlas cluster.
-
-### 6. Run the Application
-**Terminal 1 (Backend):**
+### 4. Run the Backend
+Ensure MongoDB and Ollama are running locally, then:
 ```bash
 cd backend
 uvicorn app.main:app --reload
 ```
-
-**Terminal 2 (Frontend):**
-```bash
-cd frontend
-npm run dev
-```
-
-The frontend will be accessible at `http://localhost:3000` and the backend API at `http://localhost:8000`.
-
-*(Optional Docker deployment is available via the provided `docker-compose.yml` in the root directory for rapid containerized setup.)*
 
 ## Usage
 

@@ -6,7 +6,7 @@ import os
 import json
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
-from app.ai.investigator_agent import call_hf_api
+from app.ai.local_llm import generate
 
 router = APIRouter()
 
@@ -195,7 +195,7 @@ Format your response EXACTLY as JSON with the following structure:
     
     try:
         # Use a faster, smaller model (7B) for report generation to significantly increase generation speed
-        ai_response = call_hf_api("You are an expert investigation assistant.", prompt, model="Qwen/Qwen2.5-7B-Instruct")
+        ai_response = await generate("You are an expert investigation assistant.", prompt, format="json")
         if not ai_response:
             raise ValueError("AI returned an empty response. Falling back to rule-based summary.")
             
@@ -224,9 +224,9 @@ Format your response EXACTLY as JSON with the following structure:
         }
     except Exception as e:
         print("AI generation failed or not configured, using fallback:", str(e))
-        report["executive_summary"] = "Fallback executive summary."
-        report["ai_insights"] = "Fallback AI insights."
-        report["recommendations"] = "Fallback recommendations."
+        report["executive_summary"] = f"Executive summary for case '{case.get('name')}'. This case involves {len(entities)} entities and {len(relationships)} relationships."
+        report["ai_insights"] = f"Initial analysis reveals {len(high_risk_entities)} high risk entities out of {len(entities)} total entities."
+        report["recommendations"] = "Please review the high-risk entities and their relationships manually as AI generation is currently unavailable."
         report["ai_assessment"] = {
             "overall_assessment": f"This case '{case.get('name')}' contains {len(entities)} extracted entities and {len(relationships)} known relationships based on {len(evidence)} evidence files.",
             "key_findings": ["Review high-risk entities.", "Investigate heavily connected hubs.", "Verify geographic coordinates of known locations."],

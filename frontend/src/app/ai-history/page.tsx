@@ -60,7 +60,12 @@ export default function AIHistoryPage() {
         </div>
       ) : history.length === 0 ? (
         <div className="p-16 flex flex-col items-center justify-center gap-3 border border-dashed border-[var(--border-primary)] rounded-2xl bg-[var(--surface-primary)]/50 text-center">
-          <span className="text-4xl opacity-50">🤖</span>
+          <div className="relative flex items-center justify-center w-12 h-12 text-[var(--accent-primary)] drop-shadow-[0_0_15px_rgba(59,130,246,0.3)] mb-2 mx-auto opacity-50">
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
+              <polygon points="50,2 98,26 98,74 50,98 2,74 2,26" fill="rgba(37, 99, 235, 0.2)" stroke="currentColor" strokeWidth="5" />
+            </svg>
+            <span className="font-extrabold text-[var(--text-primary)] text-xl z-10">N</span>
+          </div>
           <p className="text-sm font-bold text-[var(--text-primary)]">No AI Interaction History</p>
           <span className="text-xs text-[var(--text-secondary)] max-w-md mt-1">
             You have not queried the AI Investigator for {activeCaseId ? "this case" : "any cases"} yet. Use the Global Chatbot to begin.

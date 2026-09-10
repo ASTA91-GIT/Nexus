@@ -5,7 +5,8 @@ class Settings(BaseSettings):
     MONGODB_URI: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "nexus"
     JWT_SECRET: str = "supersecretkey"
-    HUGGINGFACE_API_KEY: str = ""
+    NEXUS_LOCAL_AI_URL: str = "http://localhost:11434"
+    NEXUS_LOCAL_AI_MODEL: str = "qwen2.5:7b"
     FRONTEND_URL: str = "http://localhost:3000"
     
     class Config:

@@ -214,7 +214,8 @@ Create a `.env` file in the `backend/` directory:
 MONGODB_URI=mongodb://localhost:27017
 DATABASE_NAME=nexus
 JWT_SECRET=your_secure_jwt_secret_here
-HUGGINGFACE_API_KEY=your_huggingface_api_key_here
+NEXUS_LOCAL_AI_URL=http://localhost:11434
+NEXUS_LOCAL_AI_MODEL=qwen2.5:7b
 FRONTEND_URL=http://localhost:3000
 ```
 

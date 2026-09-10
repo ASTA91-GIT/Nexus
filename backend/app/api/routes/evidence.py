@@ -240,13 +240,23 @@ async def process_evidence_text_background(db, file_path: str, filename: str, ca
         )
         print(f"[EVIDENCE_BG] Evidence {evidence_id} processed. Entities created: {entities_created}, Relationships created: {relationships_created}")
         
-    except Exception as e:
-        print(f"Background extraction failed: {e}")
+    except asyncio.CancelledError:
+        print(f"[EVIDENCE_BG] Background extraction cancelled by system/fastapi for {evidence_id}")
         await db["evidence"].update_one(
             {"_id": ObjectId(evidence_id)},
             {"$set": {
                 "processing_status": "COMPLETED",
-                "extraction_status": "FAILED"
+                "extraction_status": "CLIENT_DISCONNECTED"
+            }}
+        )
+    except Exception as e:
+        print(f"Background extraction failed: {e}")
+        status_msg = "LOCAL_AI_ERROR" if "LOCAL_AI" in str(e) else "PROCESSING_FAILED"
+        await db["evidence"].update_one(
+            {"_id": ObjectId(evidence_id)},
+            {"$set": {
+                "processing_status": "COMPLETED",
+                "extraction_status": status_msg
             }}
         )
 

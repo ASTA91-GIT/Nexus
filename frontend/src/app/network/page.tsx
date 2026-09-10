@@ -50,13 +50,13 @@ function NetworkView() {
 
 
   // Fetch graph data for the active case
-  const fetchGraphData = useCallback(async (caseId: string) => {
+  const fetchGraphData = useCallback(async (caseId: string, silent: boolean = false) => {
     if (!caseId) return;
     const token = getToken();
     if (!token) return;
 
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       // Fetch Network Graph representation
       const res = await fetch(getApiUrl(`/api/network/${caseId}`), {
         headers: { Authorization: `Bearer ${token}` }
@@ -69,7 +69,7 @@ function NetworkView() {
     } catch (err) {
       console.error("Failed to load network graph:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [getToken]);
 
@@ -114,7 +114,7 @@ function NetworkView() {
           } else if (processingCount === 0 && wasProcessing.current) {
             // Processing just finished! Fetch the new network data without clearing the old data.
             wasProcessing.current = false;
-            fetchGraphData(activeCaseId);
+            fetchGraphData(activeCaseId, true);
           }
         }
       } catch (err) {

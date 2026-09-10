@@ -39,8 +39,35 @@ async def health():
             await db.command("ping")
             mongo_ok = True
     except Exception as exc:
-        return {"status": "degraded", "mongodb": False, "error": str(exc)}
-    return {"status": "ok" if mongo_ok else "starting", "mongodb": mongo_ok}
+        print(f"MongoDB health check failed: {exc}")
+        
+    local_ai_server_ready = False
+    local_ai_model_ready = False
+    
+    import httpx
+    ollama_url = os.getenv("NEXUS_LOCAL_AI_URL", "http://localhost:11434")
+    model = os.getenv("NEXUS_LOCAL_AI_MODEL", "qwen2.5:7b")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{ollama_url}/api/tags", timeout=2.0)
+            if resp.status_code == 200:
+                local_ai_server_ready = True
+                models = resp.json().get("models", [])
+                if any(m.get("name") == model or m.get("name") == model + ":latest" for m in models):
+                    local_ai_model_ready = True
+    except Exception as exc:
+        print(f"Ollama health check failed: {exc}")
+        
+    status = "ok" if (mongo_ok and local_ai_server_ready and local_ai_model_ready) else "degraded"
+    
+    return {
+        "status": status,
+        "APPLICATION_READY": True,
+        "DATABASE_READY": mongo_ok,
+        "LOCAL_AI_SERVER_READY": local_ai_server_ready,
+        "LOCAL_AI_MODEL_READY": local_ai_model_ready
+    }
 
 # Serve Next.js frontend static build if it exists
 frontend_build_dir = os.path.join(os.path.dirname(__file__), "../../frontend/out")

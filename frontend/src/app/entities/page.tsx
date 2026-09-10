@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useCase } from "@/context/CaseContext";
 
 export default function EntitiesPage() {
@@ -10,6 +10,11 @@ export default function EntitiesPage() {
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [riskFilter, setRiskFilter] = useState("ALL"); // ALL, HIGH (>0.7), MEDIUM (0.4-0.7), LOW (<0.4)
   
+  // Real-time processing status
+  const [isProcessingEvidence, setIsProcessingEvidence] = useState(false);
+  const [hasFailedEvidence, setHasFailedEvidence] = useState(false);
+  const pollingRef = useRef<boolean>(false);
+
   // Selected entity profile state
   const [selectedEntity, setSelectedEntity] = useState<any | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -29,12 +34,23 @@ export default function EntitiesPage() {
     const token = localStorage.getItem("token");
     try {
       setLoading(true);
-      const res = await fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
+      
+      const [entitiesRes, evidenceRes] = await Promise.all([
+        fetch(getApiUrl(`/api/entities/?case_id=${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(getApiUrl(`/api/evidence/case/${activeCaseId}`), { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      
+      if (entitiesRes.ok) {
+        const data = await entitiesRes.json();
         setEntities(data);
+      }
+      
+      if (evidenceRes.ok) {
+        const evData = await evidenceRes.json();
+        const isProc = evData.some((e: any) => e.processing_status === "PROCESSING");
+        const hasFailed = evData.some((e: any) => e.processing_status === "FAILED");
+        setIsProcessingEvidence(isProc);
+        setHasFailedEvidence(hasFailed);
       }
     } catch (err) {
       console.error(err);
@@ -46,6 +62,62 @@ export default function EntitiesPage() {
   useEffect(() => {
     fetchEntities();
   }, [fetchEntities]);
+
+  useEffect(() => {
+    if (!activeCaseId) {
+      setIsProcessingEvidence(false);
+      setHasFailedEvidence(false);
+      return;
+    }
+
+    let intervalId: NodeJS.Timeout;
+    let wasProcessing = false;
+    
+    const checkProcessingStatus = async () => {
+      if (pollingRef.current) return;
+      pollingRef.current = true;
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        pollingRef.current = false;
+        return;
+      }
+      
+      try {
+        const res = await fetch(getApiUrl(`/api/evidence/case/${activeCaseId}`), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const latestEvidenceList = await res.json();
+          const isProc = latestEvidenceList.some((e: any) => e.processing_status === "PROCESSING");
+          const hasFailed = latestEvidenceList.some((e: any) => e.processing_status === "FAILED");
+          
+          setIsProcessingEvidence(isProc);
+          setHasFailedEvidence(hasFailed);
+          
+          if (isProc) {
+            wasProcessing = true;
+          } else if (!isProc && wasProcessing) {
+            wasProcessing = false;
+            fetchEntities();
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check evidence processing status:", err);
+      } finally {
+        pollingRef.current = false;
+      }
+    };
+
+    // Every 2 seconds for realtime updates
+    intervalId = setInterval(checkProcessingStatus, 2000);
+    checkProcessingStatus();
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [activeCaseId, fetchEntities]);
 
   // Load detailed profile relationships when selectedEntity changes
   useEffect(() => {
@@ -167,12 +239,36 @@ export default function EntitiesPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
             <span className="text-xs text-zinc-500">Retrieving case entity directory...</span>
           </div>
+        ) : isProcessingEvidence && filteredEntities.length === 0 ? (
+          <div className="p-16 border border-white/5 bg-zinc-900/20 rounded-2xl flex flex-col items-center justify-center gap-4 text-center">
+            <i className="fa-solid fa-database text-3xl text-blue-500 animate-pulse"></i>
+            <div>
+              <h3 className="text-lg font-bold text-white mb-1">Loading entities</h3>
+              <p className="text-sm text-zinc-400">Processing investigation evidence and extracting entities...</p>
+            </div>
+            <p className="text-xs text-zinc-500 max-w-md mt-2">Please wait while NEXUS analyzes the uploaded evidence.</p>
+          </div>
+        ) : hasFailedEvidence && filteredEntities.length === 0 ? (
+          <div className="p-16 border border-dashed border-red-500/20 bg-red-500/5 rounded-2xl flex flex-col items-center justify-center gap-4 text-center">
+            <i className="fa-solid fa-triangle-exclamation text-3xl text-red-500"></i>
+            <div>
+              <h3 className="text-lg font-bold text-red-400 mb-1">Entity extraction failed</h3>
+              <p className="text-sm text-red-300/80">Evidence processing could not be completed.</p>
+            </div>
+            <p className="text-xs text-red-300/60 max-w-md mt-2">Please review the evidence processing status.</p>
+          </div>
         ) : filteredEntities.length === 0 ? (
           <div className="p-16 border border-dashed border-white/5 rounded-2xl text-center text-zinc-600">
             No entities found matching search filters. Upload evidence files to populate case directory.
           </div>
         ) : (
-          <div className="overflow-y-auto pr-1 flex-1">
+          <div className="overflow-y-auto pr-1 flex-1 flex flex-col gap-4">
+            {isProcessingEvidence && (
+              <div className="flex items-center gap-3 px-4 py-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400 text-sm font-medium animate-pulse">
+                <i className="fa-solid fa-database"></i>
+                Analyzing newly uploaded evidence...
+              </div>
+            )}
             <div className="overflow-x-auto border border-white/5 rounded-2xl bg-zinc-900/10">
               <table className="w-full border-collapse text-left text-sm text-zinc-400">
                 <thead>

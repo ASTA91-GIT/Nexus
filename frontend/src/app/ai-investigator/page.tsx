@@ -87,7 +87,12 @@ export default function AiInvestigatorPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 max-w-md mx-auto">
-                  <span className="text-5xl mb-4 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">🤖</span>
+                  <div className="relative flex items-center justify-center w-16 h-16 text-blue-400 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] mb-4 mx-auto">
+                    <svg className="absolute inset-0 w-full h-full text-[var(--accent-primary)]/80" viewBox="0 0 100 100">
+                      <polygon points="50,2 98,26 98,74 50,98 2,74 2,26" fill="rgba(37, 99, 235, 0.2)" stroke="currentColor" strokeWidth="5" />
+                    </svg>
+                    <span className="font-extrabold text-white text-2xl z-10">N</span>
+                  </div>
                   <h3 className="text-lg font-extrabold text-[var(--text-primary)]">NEXUS Investigation Agent</h3>
                   <p className="text-xs text-[var(--text-secondary)] mt-2 leading-relaxed">
                     Ask me about connection paths between suspects, why specific nodes carry high risk index, or for summaries of case evidence files.
